@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E2H Curriculum Learning</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px 20px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .header h1 {
+            font-size: 1.5em;
+            font-weight: normal;
+        }
+
+        .header p {
+            font-size: 0.9em;
+            color: #ecf0f1;
+            margin-top: 5px;
+        }
+
+        .main-content {
+            display: flex;
+            min-height: 500px;
+        }
+
+        .chat-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #ddd;
+        }
+
+        .stats-section {
+            width: 300px;
+            background: #f9f9f9;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        #chat {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background: white;
+        }
+
+        .message {
+            margin-bottom: 10px;
+        }
+
+        .user-message {
+            text-align: right;
+        }
+
+        .agent-message {
+            text-align: left;
+        }
+
+        .system-message {
+            text-align: center;
+            font-style: italic;
+            color: #7f8c8d;
+            margin: 10px 0;
+            padding: 5px;
+            font-size: 0.9em;
+        }
+
+        .message-content {
+            display: inline-block;
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 4px;
+            background: #f1f1f1;
+            color: #333;
+        }
+
+        .user-message .message-content {
+            background: #3498db;
+            color: white;
+        }
+
+        .difficulty-badge {
+            font-size: 0.7em;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-bottom: 3px;
+            display: inline-block;
+        }
+
+        .trivial { background: #d4edda; color: #155724; }
+        .easy { background: #d1ecf1; color: #0c5460; }
+        .medium { background: #fff3cd; color: #856404; }
+        .hard { background: #f8d7da; color: #721c24; }
+
+        .input-section {
+            padding: 10px;
+            background: #f9f9f9;
+            border-top: 1px solid #ddd;
+            display: flex;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+
+        #sendBtn {
+            padding: 8px 15px;
+            margin-left: 5px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        #sendBtn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .stats-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .stats-card h3 {
+            font-size: 1em;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        .progress-container {
+            margin: 5px 0;
+        }
+
+        .progress-label {
+            font-size: 0.8em;
+            color: #7f8c8d;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: #ecf0f1;
+            margin-top: 2px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #3498db;
+        }
+
+        .controls {
+            margin-bottom: 10px;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            margin-top: 5px;
+        }
+
+        .status-section {
+            background: #ecf0f1;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .btn-check {
+            background: #2ecc71;
+            color: white;
+        }
+
+        .btn-demo {
+            background: #9b59b6;
+            color: white;
+        }
+
+        .btn-reset {
+            background: #e74c3c;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .stats-section {
+                width: 100%;
+                border-top: 1px solid #ddd;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>E2H Curriculum Learning Framework</h1>
+            <p>Experimental interface for easy-to-hard curriculum scheduling with local LLM</p>
+        </div>
+
+        <div class="status-section">
+            <div>Model: llama3.1-8b-instruct (quantized)</div>
+            <div class="controls">
+                <button id="healthBtn" class="btn btn-check">Check Status</button>
+                <button id="memoryBtn" class="btn btn-info">Memory Summary</button>
+                <button id="resetBtn" class="btn btn-reset">Reset Conversation</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="chat-section">
+                <div id="chat"></div>
+                <div class="input-section">
+                    <input type="text" id="messageInput" placeholder="Enter your prompt..." disabled>
+                    <button id="sendBtn" disabled>Send</button>
+                </div>
+            </div>
+
+            <div class="stats-section">
+                <div class="stats-card">
+                    <h3>Training Progress</h3>
+                    <div class="progress-container">
+                        <div class="progress-label">Iteration: <span id="iteration">0</span>/<span id="maxIterations">100</span></div>
+                        <div class="progress-bar">
+                            <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats-card">
+                    <h3>Difficulty Distribution</h3>
+                    <div class="progress-container">
+                        <div class="progress-label">Trivial: <span id="trivialProb">0%</span></div>
+                        <div class="progress-bar">
+                            <div id="trivialBar" class="progress-fill" style="width: 0%; background: #2ecc71"></div>
+                        </div>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-label">Easy: <span id="easyProb">0%</span></div>
+                        <div class="progress-bar">
+                            <div id="easyBar" class="progress-fill" style="width: 0%; background: #3498db"></div>
+                        </div>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-label">Medium: <span id="mediumProb">0%</span></div>
+                        <div class="progress-bar">
+                            <div id="mediumBar" class="progress-fill" style="width: 0%; background: #f39c12"></div>
+                        </div>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-label">Hard: <span id="hardProb">0%</span></div>
+                        <div class="progress-bar">
+                            <div id="hardBar" class="progress-fill" style="width: 0%; background: #e74c3c"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats-card">
+                    <h3>Learning Parameters</h3>
+                    <div class="controls">
+                        <label>Scheduler Type:</label>
+                        <select id="schedulerType">
+                            <option value="cosine">Cosine</option>
+                            <option value="gaussian">Gaussian</option>
+                        </select>
+                    </div>
+                    <div class="controls">
+                        <label>Temperature: <span id="tempValue">0.7</span></label>
+                        <input type="range" id="temperature" min="0.1" max="1.0" step="0.1" value="0.7">
+                    </div>
+                </div>
+
+                <div class="stats-card">
+                    <h3> Conversational Memory</h3>
+                    <div>Exchanges: <span id="memoryLength">0</span></div>
+                    <div>Total Messages: <span id="memorySize">0</span></div>
+                    <div>Recent Difficulties: <span id="difficultyHistory">None</span></div>
+                </div>
+
+                <div class="stats-card">
+                    <h3>Session Metrics</h3>
+                    <div>Mode: <span id="currentMode">Initializing</span></div>
+                    <div>Messages: <span id="messageCount">0</span></div>
+                    <div>Avg. length: <span id="avgLength">0</span> tokens</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/memory_app.js"></script>
+</body>
+</html>
