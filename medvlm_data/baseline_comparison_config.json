@@ -1,0 +1,47 @@
+{
+  "baseline_models": {
+    "llava_med": {
+      "name": "LLaVA-Med",
+      "description": "Medical adaptation of LLaVA",
+      "paper": "https://arxiv.org/abs/2306.00890",
+      "github": "https://github.com/microsoft/LLaVA-Med",
+      "model_type": "vision_language_model",
+      "medical_specialization": true
+    },
+    "med_flamingo": {
+      "name": "Med-Flamingo",
+      "description": "Medical few-shot vision-language model",
+      "paper": "https://arxiv.org/abs/2307.15189",
+      "github": "https://github.com/snap-stanford/med-flamingo",
+      "model_type": "few_shot_learner",
+      "medical_specialization": true
+    },
+    "chatcad": {
+      "name": "ChatCAD",
+      "description": "Conversational Computer-Aided Diagnosis",
+      "paper": "https://arxiv.org/abs/2302.07257",
+      "model_type": "conversational_diagnosis",
+      "medical_specialization": true
+    },
+    "medllavago": {
+      "name": "Med-LLaVA",
+      "description": "Medical Large Language and Vision Assistant",
+      "model_type": "medical_assistant",
+      "medical_specialization": true
+    }
+  },
+  "evaluation_metrics": {
+    "accuracy": "Exact match accuracy",
+    "bleu_score": "BLEU score for text generation",
+    "rouge_l": "ROUGE-L score for text similarity",
+    "medical_accuracy": "Domain-specific medical accuracy",
+    "response_time": "Average response time in seconds"
+  },
+  "benchmark_tasks": {
+    "visual_qa": "Visual Question Answering on medical images",
+    "medical_diagnosis": "Medical diagnosis from visual input",
+    "pathology_analysis": "Pathological finding analysis",
+    "report_generation": "Medical report generation",
+    "image_captioning": "Medical image captioning"
+  }
+}

@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏥 E2H Medical Agent - AI-Powered Medical Consultation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 15px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            margin-bottom: 10px;
+            font-size: 2.2em;
+            font-weight: 700;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .status-item {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 0;
+            height: 700px;
+        }
+
+        .chat-section {
+            display: flex;
+            flex-direction: column;
+            border-right: 2px solid #f0f0f0;
+        }
+
+        .stats-section {
+            background: #f8f9fa;
+            padding: 25px;
+            overflow-y: auto;
+        }
+
+        #chat {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+            background: linear-gradient(to bottom, #fafafa 0%, #f5f5f5 100%);
+        }
+
+        .message {
+            margin-bottom: 20px;
+            animation: messageSlide 0.3s ease-out;
+        }
+
+        @keyframes messageSlide {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-message {
+            text-align: right;
+        }
+
+        .agent-message {
+            text-align: left;
+        }
+
+        .system-message {
+            text-align: center;
+            font-style: italic;
+            color: #666;
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 10px;
+        }
+
+        .message-content {
+            display: inline-block;
+            max-width: 75%;
+            padding: 15px 20px;
+            border-radius: 20px;
+            word-wrap: break-word;
+            position: relative;
+        }
+
+        .user-message .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .agent-message .message-content {
+            background: white;
+            color: #333;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
+        }
+
+        .message-metadata {
+            font-size: 0.8em;
+            margin-top: 8px;
+            opacity: 0.7;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .metadata-item {
+            background: rgba(255,255,255,0.8);
+            padding: 4px 8px;
+            border-radius: 12px;
+            color: #333;
+        }
+
+        .difficulty-badge {
+            font-size: 0.75em;
+            padding: 4px 8px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            display: inline-block;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .trivial { background: #d4edda; color: #155724; }
+        .easy { background: #d1ecf1; color: #0c5460; }
+        .medium { background: #fff3cd; color: #856404; }
+        .hard { background: #f8d7da; color: #721c24; }
+
+        .domain-badge {
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .input-section {
+            padding: 25px;
+            background: white;
+            border-top: 2px solid #f0f0f0;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        #messageInput:focus {
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .stats-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
+        }
+
+        .stats-card h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.2em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 10px;
+            margin: 8px 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.4s ease;
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        select, input[type="range"] {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            font-size: 14px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .confidence-meter {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #dc3545 0%, #ffc107 50%, #28a745 100%);
+            transition: width 0.3s ease;
+        }
+
+        .specialist-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0;
+        }
+
+        .specialist-chip {
+            background: #e7f3ff;
+            color: #0066cc;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            
+            .stats-section {
+                border-top: 2px solid #f0f0f0;
+                border-right: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .message-content {
+                max-width: 90%;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 E2H Medical Agent</h1>
+            <p>AI-Powered Medical Consultation with Curriculum Learning</p>
+            <div class="status-bar">
+                <div class="status-item" id="connectionStatus">🟢 Connected</div>
+                <div class="status-item" id="currentMode">📚 Learning Mode</div>
+                <div class="status-item" id="agentStatus">🤖 Agent Ready</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="chat-section">
+                <div id="chat">
+                    <div class="system-message">
+                        🏥 Welcome to the E2H Medical Agent System!<br>
+                        This AI assistant uses curriculum learning to provide medical consultations.<br>
+                        It starts with basic questions and progressively handles complex medical scenarios.<br>
+                        <strong>Note:</strong> This is for educational purposes only. Always consult a qualified healthcare professional.
+                    </div>
+                </div>
+                
+                <div class="input-section">
+                    <input type="text" id="messageInput" placeholder="Ask a medical question..." disabled>
+                    <button id="sendBtn" class="btn btn-primary" disabled>Send</button>
+                    <button id="clearBtn" class="btn btn-secondary">Clear</button>
+                </div>
+            </div>
+
+            <div class="stats-section">
+                <div class="stats-card">
+                    <h3>📊 Curriculum Progress</h3>
+                    <div>Iteration: <span id="iteration">0</span>/<span id="maxIterations">100</span></div>
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill" style="width: 0%; background: linear-gradient(90deg, #667eea, #764ba2);"></div>
+                    </div>
+                </div>
+
+                <div class="stats-card">
+                    <h3>🎯 Difficulty Distribution</h3>
+                    <div>Trivial: <span id="trivialProb">25%</span></div>
+                    <div class="progress-bar">
+                        <div id="trivialBar" class="progress-fill" style="width: 25%; background: #28a745;"></div>
+                    </div>
+                    <div>Easy: <span id="easyProb">25%</span></div>
+                    <div class="progress-bar">
+                        <div id="easyBar" class="progress-fill" style="width: 25%; background: #17a2b8;"></div>
+                    </div>
+                    <div>Medium: <span id="mediumProb">25%</span></div>
+                    <div class="progress-bar">
+                        <div id="mediumBar" class="progress-fill" style="width: 25%; background: #ffc107;"></div>
+                    </div>
+                    <div>Hard: <span id="hardProb">25%</span></div>
+                    <div class="progress-bar">
+                        <div id="hardBar" class="progress-fill" style="width: 25%; background: #dc3545;"></div>
+                    </div>
+                </div>
+
+                <div class="stats-card">
+                    <h3>🏥 Current Consultation</h3>
+                    <div>Domain: <span id="currentDomain">-</span></div>
+                    <div>Difficulty: <span id="currentDifficulty">-</span></div>
+                    <div>Confidence: <span id="currentConfidence">-</span></div>
+                    <div class="confidence-meter">
+                        <div id="confidenceFill" class="confidence-fill" style="width: 0%;"></div>
+                    </div>
+                    <div>Specialists Consulted:</div>
+                    <div id="specialistsList" class="specialist-list"></div>
+                </div>
+
+                <div class="stats-card">
+                    <h3>⚙️ System Controls</h3>
+                    <div class="controls">
+                        <button id="resetBtn" class="btn btn-secondary">Reset Progress</button>
+                        <button id="exportBtn" class="btn btn-secondary">Export Chat</button>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <label>Session ID: <span id="sessionId">default</span></label>
+                    </div>
+                </div>
+
+                <div class="stats-card">
+                    <h3>📈 Session Statistics</h3>
+                    <div>Total Queries: <span id="totalQueries">0</span></div>
+                    <div>Conversation Length: <span id="conversationLength">0</span></div>
+                    <div>Avg Confidence: <span id="avgConfidence">0%</span></div>
+                    <div>Most Common Domain: <span id="commonDomain">-</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class MedicalAgentInterface {
+            constructor() {
+                this.sessionId = 'medical_session_' + Date.now();
+                this.conversationHistory = [];
+                this.totalQueries = 0;
+                this.confidenceHistory = [];
+                this.domainHistory = [];
+                
+                this.initializeElements();
+                this.initializeEventListeners();
+                this.initializeSystem();
+            }
+
+            initializeElements() {
+                this.chatContainer = document.getElementById('chat');
+                this.messageInput = document.getElementById('messageInput');
+                this.sendBtn = document.getElementById('sendBtn');
+                this.clearBtn = document.getElementById('clearBtn');
+                this.resetBtn = document.getElementById('resetBtn');
+                this.exportBtn = document.getElementById('exportBtn');
+            }
+
+            initializeEventListeners() {
+                this.sendBtn.addEventListener('click', () => this.sendMessage());
+                this.clearBtn.addEventListener('click', () => this.clearConversation());
+                this.resetBtn.addEventListener('click', () => this.resetCurriculum());
+                this.exportBtn.addEventListener('click', () => this.exportConversation());
+                
+                this.messageInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+            }
+
+            async initializeSystem() {
+                try {
+                    await this.updateCurriculumStatus();
+                    this.enableInterface();
+                    this.addSystemMessage('🤖 Medical agent initialized successfully! Ask me any medical question.');
+                    document.getElementById('sessionId').textContent = this.sessionId.split('_')[2];
+                } catch (error) {
+                    this.addErrorMessage('Failed to initialize medical agent: ' + error.message);
+                }
+            }
+
+            enableInterface() {
+                this.messageInput.disabled = false;
+                this.sendBtn.disabled = false;
+                this.messageInput.focus();
+                document.getElementById('agentStatus').innerHTML = '🤖 Agent Ready';
+            }
+
+            async sendMessage() {
+                const message = this.messageInput.value.trim();
+                if (!message) return;
+
+                this.messageInput.value = '';
+                this.setLoading(true);
+                this.addMessage('user', message);
+
+                try {
+                    const response = await fetch('/api/medical_chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: message,
+                            session_id: this.sessionId
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+
+                    this.addMessage('agent', data.response, data.metadata);
+                    this.updateStats(data.metadata, data.session_stats);
+                    await this.updateCurriculumStatus();
+
+                } catch (error) {
+                    this.addErrorMessage('Consultation failed: ' + error.message);
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+
+            addMessage(role, content, metadata = null) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${role}-message`;
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+
+                if (metadata && role === 'agent') {
+                    // Add difficulty badge
+                    const difficultyBadge = document.createElement('div');
+                    difficultyBadge.className = `difficulty-badge ${metadata.difficulty_level}`;
+                    difficultyBadge.textContent = metadata.difficulty_level.toUpperCase();
+                    contentDiv.appendChild(difficultyBadge);
+
+                    // Add domain badge
+                    const domainBadge = document.createElement('span');
+                    domainBadge.className = 'domain-badge';
+                    domainBadge.textContent = metadata.domain.toUpperCase();
+                    contentDiv.appendChild(domainBadge);
+
+                    contentDiv.appendChild(document.createElement('br'));
+                    contentDiv.appendChild(document.createElement('br'));
+                }
+
+                // Add main content
+                const lines = content.split('\n');
+                lines.forEach((line, index) => {
+                    if (index > 0) contentDiv.appendChild(document.createElement('br'));
+                    contentDiv.appendChild(document.createTextNode(line));
+                });
+
+                // Add metadata for agent responses
+                if (metadata && role === 'agent') {
+                    const metadataDiv = document.createElement('div');
+                    metadataDiv.className = 'message-metadata';
+                    
+                    const items = [
+                        `Confidence: ${Math.round(metadata.confidence * 100)}%`,
+                        `Specialists: ${metadata.specialists_consulted.length}`,
+                        `Retrieved: ${metadata.retrieved_context.length} docs`
+                    ];
+
+                    items.forEach(item => {
+                        const span = document.createElement('span');
+                        span.className = 'metadata-item';
+                        span.textContent = item;
+                        metadataDiv.appendChild(span);
+                    });
+
+                    contentDiv.appendChild(metadataDiv);
+                }
+
+                messageDiv.appendChild(contentDiv);
+                this.chatContainer.appendChild(messageDiv);
+                this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+
+                // Store in history
+                this.conversationHistory.push({ role, content, metadata, timestamp: new Date() });
+            }
+
+            addSystemMessage(content) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'system-message';
+                messageDiv.innerHTML = content;
+                this.chatContainer.appendChild(messageDiv);
+                this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+            }
+
+            addErrorMessage(content) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'error-message';
+                messageDiv.textContent = '❌ ' + content;
+                this.chatContainer.appendChild(messageDiv);
+                this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+            }
+
+            updateStats(metadata, sessionStats) {
+                // Update current consultation info
+                document.getElementById('currentDomain').textContent = metadata.domain;
+                document.getElementById('currentDifficulty').textContent = metadata.difficulty_level;
+                document.getElementById('currentConfidence').textContent = Math.round(metadata.confidence * 100) + '%';
+                
+                // Update confidence meter
+                document.getElementById('confidenceFill').style.width = (metadata.confidence * 100) + '%';
+
+                // Update specialists list
+                const specialistsList = document.getElementById('specialistsList');
+                specialistsList.innerHTML = '';
+                metadata.specialists_consulted.forEach(specialist => {
+                    const chip = document.createElement('span');
+                    chip.className = 'specialist-chip';
+                    chip.textContent = specialist;
+                    specialistsList.appendChild(chip);
+                });
+
+                // Update session statistics
+                this.totalQueries = sessionStats.total_queries;
+                this.confidenceHistory.push(metadata.confidence);
+                this.domainHistory.push(metadata.domain);
+
+                document.getElementById('totalQueries').textContent = this.totalQueries;
+                document.getElementById('conversationLength').textContent = sessionStats.conversation_length;
+                
+                const avgConfidence = this.confidenceHistory.reduce((a, b) => a + b, 0) / this.confidenceHistory.length;
+                document.getElementById('avgConfidence').textContent = Math.round(avgConfidence * 100) + '%';
+
+                // Most common domain
+                const domainCounts = this.domainHistory.reduce((acc, domain) => {
+                    acc[domain] = (acc[domain] || 0) + 1;
+                    return acc;
+                }, {});
+                const mostCommon = Object.keys(domainCounts).reduce((a, b) => 
+                    domainCounts[a] > domainCounts[b] ? a : b, 'general'
+                );
+                document.getElementById('commonDomain').textContent = mostCommon;
+            }
+
+            async updateCurriculumStatus() {
+                try {
+                    const response = await fetch('/api/curriculum_status');
+                    if (response.ok) {
+                        const status = await response.json();
+                        
+                        document.getElementById('iteration').textContent = status.iteration;
+                        document.getElementById('maxIterations').textContent = status.max_iterations;
+                        
+                        const progress = (status.iteration / status.max_iterations) * 100;
+                        document.getElementById('progressFill').style.width = progress + '%';
+
+                        // Update difficulty distribution
+                        for (const [level, prob] of Object.entries(status.difficulty_distribution)) {
+                            const percentage = Math.round(prob * 100);
+                            document.getElementById(`${level}Prob`).textContent = percentage + '%';
+                            document.getElementById(`${level}Bar`).style.width = percentage + '%';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to update curriculum status:', error);
+                }
+            }
+
+            async clearConversation() {
+                if (confirm('Clear conversation history?')) {
+                    try {
+                        await fetch(`/api/clear_memory/${this.sessionId}`, { method: 'POST' });
+                        this.chatContainer.innerHTML = '';
+                        this.conversationHistory = [];
+                        this.addSystemMessage('🧹 Conversation cleared. How can I help you?');
+                    } catch (error) {
+                        this.addErrorMessage('Failed to clear conversation: ' + error.message);
+                    }
+                }
+            }
+
+            async resetCurriculum() {
+                if (confirm('Reset curriculum progress? This will restart the learning progression.')) {
+                    try {
+                        await fetch('/api/reset_curriculum', { method: 'POST' });
+                        await this.updateCurriculumStatus();
+                        this.addSystemMessage('🔄 Curriculum progress reset. Starting fresh learning cycle.');
+                    } catch (error) {
+                        this.addErrorMessage('Failed to reset curriculum: ' + error.message);
+                    }
+                }
+            }
+
+            exportConversation() {
+                const exportData = {
+                    session_id: this.sessionId,
+                    timestamp: new Date().toISOString(),
+                    conversation_history: this.conversationHistory,
+                    statistics: {
+                        total_queries: this.totalQueries,
+                        avg_confidence: this.confidenceHistory.reduce((a, b) => a + b, 0) / this.confidenceHistory.length,
+                        domain_distribution: this.domainHistory.reduce((acc, domain) => {
+                            acc[domain] = (acc[domain] || 0) + 1;
+                            return acc;
+                        }, {})
+                    }
+                };
+
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `medical_consultation_${this.sessionId}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            setLoading(isLoading) {
+                this.sendBtn.disabled = isLoading;
+                this.messageInput.disabled = isLoading;
+                
+                if (isLoading) {
+                    this.sendBtn.textContent = 'Processing...';
+                    this.chatContainer.classList.add('loading');
+                    document.getElementById('agentStatus').innerHTML = '🔄 Consulting...';
+                } else {
+                    this.sendBtn.textContent = 'Send';
+                    this.chatContainer.classList.remove('loading');
+                    document.getElementById('agentStatus').innerHTML = '🤖 Agent Ready';
+                    this.messageInput.focus();
+                }
+            }
+        }
+
+        // Initialize the medical agent interface
+        document.addEventListener('DOMContentLoaded', () => {
+            new MedicalAgentInterface();
+        });
+    </script>
+</body>
+</html>

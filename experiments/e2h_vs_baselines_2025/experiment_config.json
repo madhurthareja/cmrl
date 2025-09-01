@@ -1,0 +1,28 @@
+{
+  "name": "e2h_vs_baselines_2025",
+  "description": "MedVLM benchmark comparing models on medical VQA tasks",
+  "datasets": [
+    "vqa_rad",
+    "pathvqa",
+    "slake"
+  ],
+  "models": [
+    "e2h_medical_agent",
+    "llava_med",
+    "med_flamingo"
+  ],
+  "curriculum_levels": [
+    "easy",
+    "medium",
+    "hard"
+  ],
+  "evaluation_metrics": [
+    "accuracy",
+    "bleu",
+    "rouge_l",
+    "cider",
+    "medical_accuracy"
+  ],
+  "output_dir": "./experiments/e2h_vs_baselines_2025",
+  "created_date": "2025-09-01"
+}

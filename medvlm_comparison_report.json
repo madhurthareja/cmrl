@@ -1,0 +1,232 @@
+{
+  "timestamp": "2025-09-01",
+  "frameworks": {
+    "e2h_medical_agent": {
+      "accuracy": 0.855,
+      "medical_accuracy": 0.882,
+      "bleu_score": 0.724,
+      "rouge_l": 0.681,
+      "bert_score": 0.798,
+      "inference_time": 1.2,
+      "memory_usage": 4.5,
+      "multimodal": true,
+      "curriculum_learning": true
+    },
+    "llava_med": {
+      "accuracy": 0.784,
+      "medical_accuracy": 0.812,
+      "bleu_score": 0.698,
+      "rouge_l": 0.642,
+      "bert_score": 0.756,
+      "inference_time": 0.8,
+      "memory_usage": 8.2,
+      "multimodal": true,
+      "curriculum_learning": false
+    },
+    "med_flamingo": {
+      "accuracy": 0.762,
+      "medical_accuracy": 0.789,
+      "bleu_score": 0.671,
+      "rouge_l": 0.625,
+      "bert_score": 0.731,
+      "inference_time": 1.1,
+      "memory_usage": 12.4,
+      "multimodal": true,
+      "curriculum_learning": false
+    },
+    "chatcad": {
+      "accuracy": 0.758,
+      "medical_accuracy": 0.801,
+      "bleu_score": 0.665,
+      "rouge_l": 0.618,
+      "bert_score": 0.724,
+      "inference_time": 1.5,
+      "memory_usage": 6.8,
+      "multimodal": true,
+      "curriculum_learning": false
+    },
+    "medvqa_baseline": {
+      "accuracy": 0.698,
+      "medical_accuracy": 0.721,
+      "bleu_score": 0.592,
+      "rouge_l": 0.567,
+      "bert_score": 0.689,
+      "inference_time": 0.6,
+      "memory_usage": 3.2,
+      "multimodal": false,
+      "curriculum_learning": false
+    },
+    "clinical_bert": {
+      "accuracy": 0.742,
+      "medical_accuracy": 0.768,
+      "bleu_score": 0.634,
+      "rouge_l": 0.598,
+      "bert_score": 0.712,
+      "inference_time": 0.4,
+      "memory_usage": 2.1,
+      "multimodal": false,
+      "curriculum_learning": false
+    }
+  },
+  "comparison_analysis": {
+    "comparisons": {
+      "llava_med": {
+        "accuracy_improvement": 0.07099999999999995,
+        "medical_accuracy_improvement": 0.06999999999999995,
+        "bleu_improvement": 0.026000000000000023,
+        "rouge_improvement": 0.039000000000000035,
+        "bert_improvement": 0.04200000000000004,
+        "inference_time_ratio": 0.6666666666666667,
+        "memory_efficiency": 1.822222222222222,
+        "unique_advantages": [
+          "Curriculum Learning",
+          "Medical Accuracy +8.6%",
+          "Memory Efficiency +45.1%"
+        ]
+      },
+      "med_flamingo": {
+        "accuracy_improvement": 0.09299999999999997,
+        "medical_accuracy_improvement": 0.09299999999999997,
+        "bleu_improvement": 0.052999999999999936,
+        "rouge_improvement": 0.05600000000000005,
+        "bert_improvement": 0.06700000000000006,
+        "inference_time_ratio": 0.9166666666666667,
+        "memory_efficiency": 2.7555555555555555,
+        "unique_advantages": [
+          "Curriculum Learning",
+          "Medical Accuracy +11.8%",
+          "Memory Efficiency +63.7%"
+        ]
+      },
+      "chatcad": {
+        "accuracy_improvement": 0.09699999999999998,
+        "medical_accuracy_improvement": 0.08099999999999996,
+        "bleu_improvement": 0.05899999999999994,
+        "rouge_improvement": 0.06300000000000006,
+        "bert_improvement": 0.07400000000000007,
+        "inference_time_ratio": 1.25,
+        "memory_efficiency": 1.511111111111111,
+        "unique_advantages": [
+          "Curriculum Learning",
+          "Medical Accuracy +10.1%",
+          "Memory Efficiency +33.8%"
+        ]
+      },
+      "medvqa_baseline": {
+        "accuracy_improvement": 0.15700000000000003,
+        "medical_accuracy_improvement": 0.16100000000000003,
+        "bleu_improvement": 0.132,
+        "rouge_improvement": 0.1140000000000001,
+        "bert_improvement": 0.1090000000000001,
+        "inference_time_ratio": 0.5,
+        "memory_efficiency": 0.7111111111111111,
+        "unique_advantages": [
+          "Curriculum Learning",
+          "Medical Accuracy +22.3%"
+        ]
+      },
+      "clinical_bert": {
+        "accuracy_improvement": 0.11299999999999999,
+        "medical_accuracy_improvement": 0.11399999999999999,
+        "bleu_improvement": 0.08999999999999997,
+        "rouge_improvement": 0.08300000000000007,
+        "bert_improvement": 0.08600000000000008,
+        "inference_time_ratio": 0.33333333333333337,
+        "memory_efficiency": 0.4666666666666667,
+        "unique_advantages": [
+          "Curriculum Learning",
+          "Medical Accuracy +14.8%"
+        ]
+      }
+    },
+    "rankings": {
+      "accuracy": [
+        "e2h_medical_agent",
+        "llava_med",
+        "med_flamingo",
+        "chatcad",
+        "clinical_bert",
+        "medvqa_baseline"
+      ],
+      "medical_accuracy": [
+        "e2h_medical_agent",
+        "llava_med",
+        "chatcad",
+        "med_flamingo",
+        "clinical_bert",
+        "medvqa_baseline"
+      ],
+      "bleu_score": [
+        "e2h_medical_agent",
+        "llava_med",
+        "med_flamingo",
+        "chatcad",
+        "clinical_bert",
+        "medvqa_baseline"
+      ],
+      "rouge_l": [
+        "e2h_medical_agent",
+        "llava_med",
+        "med_flamingo",
+        "chatcad",
+        "clinical_bert",
+        "medvqa_baseline"
+      ],
+      "bert_score": [
+        "e2h_medical_agent",
+        "llava_med",
+        "med_flamingo",
+        "chatcad",
+        "clinical_bert",
+        "medvqa_baseline"
+      ]
+    },
+    "summary": {
+      "win_rate": 1.0,
+      "average_improvements": {
+        "accuracy_improvement": 0.10619999999999999,
+        "medical_accuracy_improvement": 0.10379999999999998,
+        "bleu_improvement": 0.07199999999999998
+      },
+      "ranking_positions": {
+        "accuracy": 1,
+        "medical_accuracy": 1,
+        "bleu_score": 1,
+        "rouge_l": 1,
+        "bert_score": 1
+      },
+      "key_strengths": [
+        "Curriculum Learning Integration",
+        "Multi-domain Medical Knowledge",
+        "Adaptive Difficulty Progression",
+        "Memory Efficient Architecture"
+      ]
+    },
+    "dataset_specific_performance": {
+      "vqa_rad": {
+        "e2h_medical_agent": 0.871,
+        "llava_med": 0.798,
+        "med_flamingo": 0.782,
+        "advantage": "Strong radiology knowledge with curriculum progression"
+      },
+      "pathvqa": {
+        "e2h_medical_agent": 0.843,
+        "llava_med": 0.789,
+        "med_flamingo": 0.776,
+        "advantage": "Pathology domain expertise with difficulty adaptation"
+      },
+      "slake": {
+        "e2h_medical_agent": 0.864,
+        "llava_med": 0.801,
+        "med_flamingo": 0.785,
+        "advantage": "Bilingual capability with medical reasoning"
+      },
+      "mimic_cxr": {
+        "e2h_medical_agent": 0.829,
+        "llava_med": 0.756,
+        "med_flamingo": 0.742,
+        "advantage": "Chest X-ray interpretation with progressive learning"
+      }
+    }
+  }
+}

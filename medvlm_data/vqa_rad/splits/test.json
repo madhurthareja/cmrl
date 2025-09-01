@@ -1,0 +1,12 @@
+[
+  {
+    "id": "vqa_rad_003",
+    "image": "synpic300.jpg",
+    "question": "What is the most likely diagnosis based on this brain CT?",
+    "answer": "Acute ischemic stroke in the middle cerebral artery territory",
+    "question_type": "diagnosis",
+    "image_type": "ct_brain",
+    "domain": "neurology",
+    "difficulty": "hard"
+  }
+]

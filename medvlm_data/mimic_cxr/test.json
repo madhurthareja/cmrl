@@ -1,0 +1,38 @@
+{
+  "dataset_info": {
+    "name": "MIMIC-CXR",
+    "description": "Chest X-ray Database with Reports",
+    "url": "https://physionet.org/content/mimic-cxr/2.0.0/",
+    "paper": "https://arxiv.org/abs/1901.07042",
+    "size": "377,110 images, 227,835 reports",
+    "tasks": [
+      "report_generation",
+      "image_captioning"
+    ],
+    "domains": [
+      "radiology",
+      "pulmonology"
+    ],
+    "license": "PhysioNet Credentialed Health Data License"
+  },
+  "samples": [
+    {
+      "id": "mimic_cxr_sample_001",
+      "image_path": "images/sample_001.jpg",
+      "question": "What abnormality is visible in this medical image?",
+      "answer": "No acute abnormalities detected",
+      "domain": "radiology",
+      "difficulty": "easy",
+      "task_type": "report_generation"
+    },
+    {
+      "id": "mimic_cxr_sample_002",
+      "image_path": "images/sample_002.jpg",
+      "question": "Describe the pathological findings in this image.",
+      "answer": "Findings consistent with inflammatory changes",
+      "domain": "radiology",
+      "difficulty": "intermediate",
+      "task_type": "report_generation"
+    }
+  ]
+}

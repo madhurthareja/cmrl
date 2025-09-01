@@ -1,0 +1,22 @@
+[
+  {
+    "id": "pathvqa_001",
+    "image": "path_adenocarcinoma_001.jpg",
+    "question": "What type of tissue architecture is shown in this histopathology image?",
+    "answer": "Adenocarcinoma with glandular formation and nuclear pleomorphism",
+    "question_type": "architecture",
+    "image_type": "histopathology",
+    "domain": "pathology",
+    "difficulty": "hard"
+  },
+  {
+    "id": "pathvqa_002",
+    "image": "path_inflammation_001.jpg",
+    "question": "Are inflammatory cells present in this tissue?",
+    "answer": "Yes, there are abundant inflammatory cells including lymphocytes and neutrophils",
+    "question_type": "presence",
+    "image_type": "histopathology",
+    "domain": "pathology",
+    "difficulty": "medium"
+  }
+]

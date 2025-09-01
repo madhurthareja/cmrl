@@ -1,0 +1,39 @@
+{
+  "dataset_info": {
+    "name": "PMC-VQA",
+    "description": "PubMed Central Medical VQA",
+    "url": "https://github.com/xiaoman-zhang/PMC-VQA",
+    "paper": "https://arxiv.org/abs/2305.10415",
+    "size": "227,000+ image-text pairs",
+    "tasks": [
+      "medical_vqa",
+      "multimodal_understanding"
+    ],
+    "domains": [
+      "general",
+      "radiology",
+      "pathology"
+    ],
+    "license": "Apache 2.0"
+  },
+  "samples": [
+    {
+      "id": "pmc_vqa_sample_001",
+      "image_path": "images/sample_001.jpg",
+      "question": "What abnormality is visible in this medical image?",
+      "answer": "No acute abnormalities detected",
+      "domain": "general",
+      "difficulty": "easy",
+      "task_type": "medical_vqa"
+    },
+    {
+      "id": "pmc_vqa_sample_002",
+      "image_path": "images/sample_002.jpg",
+      "question": "Describe the pathological findings in this image.",
+      "answer": "Findings consistent with inflammatory changes",
+      "domain": "general",
+      "difficulty": "intermediate",
+      "task_type": "medical_vqa"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "id": "pathvqa_002",
+    "image": "path_inflammation_001.jpg",
+    "question": "Are inflammatory cells present in this tissue?",
+    "answer": "Yes, there are abundant inflammatory cells including lymphocytes and neutrophils",
+    "question_type": "presence",
+    "image_type": "histopathology",
+    "domain": "pathology",
+    "difficulty": "medium"
+  }
+]
