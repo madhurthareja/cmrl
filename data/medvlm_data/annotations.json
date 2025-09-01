@@ -1,0 +1,16 @@
+[
+  {
+    "image_path": "images/radiology/example_xray.jpg",
+    "question": "What abnormality is visible in this X-ray?",
+    "answer": "Example answer - replace with real medical annotations",
+    "domain": "radiology",
+    "difficulty": "medium"
+  },
+  {
+    "image_path": "images/pathology/example_tissue.jpg",
+    "question": "Describe the pathological findings.",
+    "answer": "Example pathology answer - replace with real data",
+    "domain": "pathology",
+    "difficulty": "hard"
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "title": "Example Radiology Document 1",
+    "content": "This is example medical content for radiology. Replace with real medical literature.",
+    "source": "Example Source",
+    "difficulty": "medium",
+    "keywords": [
+      "radiology",
+      "medicine",
+      "healthcare"
+    ]
+  }
+]
