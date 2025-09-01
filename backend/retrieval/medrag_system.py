@@ -80,7 +80,7 @@ class DomainSpecificRetriever:
         """Load domain-specific medical corpus"""
         # Try to load real data, fall back to mock data
         try:
-            from medical_data_loader import MedicalDataLoader
+            from retrieval.medical_data_loader import MedicalDataLoader
             self.data_loader = MedicalDataLoader()
             medical_docs = self.data_loader.load_text_corpus(self.domain)
             
