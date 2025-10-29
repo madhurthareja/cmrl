@@ -1,0 +1,117 @@
+@startuml E2HArchitecture
+skinparam style strictuml
+skinparam classAttributeIconSize 0
+skinparam componentStyle rectangle
+
+rectangle "Frontend" {
+  component "React Client" as ReactClient
+}
+
+node "Backend" {
+  component "FastAPI App" as FastAPI {
+    {method} POST /chat
+    {method} POST /vqa
+    {method} GET /curriculum/status
+    {method} POST /train
+  }
+  component "MedGemma VQA" as MedGemma
+  component "E2HMedicalAgent" as MedicalAgent
+}
+
+package "Agents" {
+  class TriageAgent
+  class AttendingAgent
+  class MockSpecialist
+}
+
+package "Core Utilities" {
+  class OllamaLLMInterface
+  class CurriculumScheduler
+  class MedicalDifficultyClassifier
+  class PromptTemplateManager
+  class RewardCalculator
+}
+
+package "Retrieval" {
+  class MultiDomainRAGSystem
+  class AdaptiveRetriever
+  class DomainSpecificRetriever
+  class PreferenceDatasetBuilder
+  class DPOTrainer
+}
+
+package "Training" {
+  class GRPOTrainer
+  class CurriculumMARLTrainer
+  class GRPOConfig
+}
+
+ReactClient --> FastAPI : REST/JSON
+FastAPI --> MedicalAgent : orchestrates queries
+FastAPI --> MedGemma : image QA
+
+MedicalAgent *-- OllamaLLMInterface
+MedicalAgent *-- CurriculumScheduler
+MedicalAgent *-- MedicalDifficultyClassifier
+MedicalAgent *-- PromptTemplateManager
+MedicalAgent *-- RewardCalculator
+MedicalAgent *-- MultiDomainRAGSystem
+MedicalAgent *-- TriageAgent
+MedicalAgent *-- AttendingAgent
+MedicalAgent o-- "0..*" MockSpecialist
+
+TriageAgent --> OllamaLLMInterface
+TriageAgent --> PromptTemplateManager
+TriageAgent --> MedicalDifficultyClassifier
+
+AttendingAgent --> OllamaLLMInterface
+AttendingAgent --> PromptTemplateManager
+AttendingAgent --> MultiDomainRAGSystem
+AttendingAgent o-- "0..*" MockSpecialist
+
+MockSpecialist --> OllamaLLMInterface
+
+MultiDomainRAGSystem *-- AdaptiveRetriever
+MultiDomainRAGSystem o-- "*" DomainSpecificRetriever
+PreferenceDatasetBuilder --> MultiDomainRAGSystem
+PreferenceDatasetBuilder --> OllamaLLMInterface
+PreferenceDatasetBuilder --> DPOTrainer
+
+GRPOTrainer --> MedicalAgent
+CurriculumMARLTrainer --> MedicalAgent
+GRPOTrainer --> GRPOConfig
+CurriculumMARLTrainer --> GRPOConfig
+
+MedGemma --> MedicalAgent : VQA results
+
+@enduml
+
+' Sequence diagram highlighting chat flow
+@startuml ChatFlow
+skinparam style strictuml
+actor User
+participant "React Client" as React
+participant "FastAPI /chat" as API
+participant "E2HMedicalAgent" as Agent
+participant "TriageAgent" as Triage
+participant "MockSpecialist" as Specialist
+participant "AttendingAgent" as Attending
+participant "MultiDomainRAGSystem" as RAG
+
+User -> React : enter question
+React -> API : POST /chat
+API -> Agent : process_medical_query()
+Agent -> Agent : classify difficulty
+Agent -> Triage : triage_query()
+Triage -> Agent : domain classification
+Agent -> Specialist : consult()
+Specialist -> Agent : SpecialistResponse
+Agent -> Attending : generate_final_answer()
+Attending -> RAG : retrieve_with_curriculum()
+RAG --> Attending : documents
+Attending -> Specialist : incorporate consultations
+Attending -> Agent : AgentResponse
+Agent -> API : AgentResponse
+API -> React : JSON payload
+React -> User : render answer + metadata
+@enduml
