@@ -1,0 +1,13 @@
+[
+  {
+    "title": "Example Pathology Document 1",
+    "content": "This is example medical content for pathology. Replace with real medical literature.",
+    "source": "Example Source",
+    "difficulty": "medium",
+    "keywords": [
+      "pathology",
+      "medicine",
+      "healthcare"
+    ]
+  }
+]

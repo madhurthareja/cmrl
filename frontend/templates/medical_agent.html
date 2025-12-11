@@ -1,0 +1,1455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedAI Assistant - Intelligent Medical Consultation</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #7c3aed;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --light: #f8fafc;
+            --dark: #1e293b;
+            --gray-100: #f1f5f9;
+            --gray-200: #e2e8f0;
+            --gray-300: #cbd5e1;
+            --gray-600: #475569;
+            --gray-700: #334155;
+            --border-radius: 12px;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            min-height: 100vh;
+            color: var(--dark);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 20px 30px;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 5px solid var(--primary);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-icon {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+        }
+
+        .logo-text h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 4px;
+        }
+
+        .logo-text p {
+            color: var(--gray-600);
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--gray-100);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Main Layout */
+        .main-content {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 20px;
+            min-height: 0;
+        }
+
+        /* Chat Section */
+        .chat-section {
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--gray-200);
+            background: var(--gray-100);
+        }
+
+        .chat-header h2 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chat-header h2 i {
+            color: var(--primary);
+        }
+
+        #chat {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: var(--light);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Message Styling */
+        .message {
+            max-width: 80%;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-message {
+            align-self: flex-end;
+        }
+
+        .agent-message {
+            align-self: flex-start;
+        }
+
+        .message-bubble {
+            padding: 16px 20px;
+            border-radius: 18px;
+            position: relative;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .user-message .message-bubble {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .agent-message .message-bubble {
+            background: white;
+            color: var(--dark);
+            border: 1px solid var(--gray-200);
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-metadata {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 8px;
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-trivial { background: #d1fae5; color: #065f46; }
+        .badge-easy { background: #dbeafe; color: #1e40af; }
+        .badge-medium { background: #fef3c7; color: #92400e; }
+        .badge-hard { background: #fee2e2; color: #991b1b; }
+
+        .domain-tag {
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Input Section */
+        .input-section {
+            padding: 20px;
+            border-top: 1px solid var(--gray-200);
+            background: white;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 14px 18px;
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            background: var(--gray-100);
+        }
+
+        #messageInput:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .btn {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-secondary {
+            background: var(--gray-200);
+            color: var(--gray-700);
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-300);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* VQA Panel */
+        .vqa-panel {
+            background: var(--gray-100);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 10px;
+            border: 2px dashed var(--gray-300);
+        }
+
+        .vqa-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            color: var(--gray-700);
+            font-weight: 600;
+        }
+
+        .vqa-header i {
+            color: var(--primary);
+        }
+
+        .file-upload {
+            position: relative;
+            display: inline-block;
+        }
+
+        .file-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            background: white;
+            border: 2px solid var(--gray-200);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .file-label:hover {
+            border-color: var(--primary);
+            background: var(--gray-100);
+        }
+
+        .file-label i {
+            color: var(--primary);
+        }
+
+        .file-input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .image-preview {
+            margin: 15px 0;
+            display: none;
+        }
+
+        .image-preview.visible {
+            display: block;
+        }
+
+        .preview-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .preview-container img {
+            max-width: 200px;
+            border-radius: 10px;
+            border: 3px solid white;
+            box-shadow: var(--shadow);
+        }
+
+        .remove-image {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 30px;
+            height: 30px;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .stats-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 24px;
+            box-shadow: var(--shadow);
+        }
+
+        .stats-card h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stats-card h3 i {
+            color: var(--primary);
+        }
+
+        .progress-container {
+            margin: 15px 0;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .progress-bar {
+            height: 10px;
+            background: var(--gray-200);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.5s ease;
+        }
+
+        .confidence-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .confidence-bar {
+            flex: 1;
+            height: 8px;
+            background: linear-gradient(90deg, var(--danger), var(--warning), var(--success));
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .confidence-level {
+            height: 100%;
+            background: var(--dark);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .specialist-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .specialist-chip {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn-sm {
+            padding: 10px 16px;
+            font-size: 0.9rem;
+        }
+
+        .session-info {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr auto;
+            }
+            
+            .sidebar {
+                grid-row: 2;
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .sidebar {
+                grid-template-columns: 1fr;
+            }
+            
+            .message {
+                max-width: 90%;
+            }
+            
+            .input-group {
+                flex-direction: column;
+            }
+            
+            .btn {
+                justify-content: center;
+            }
+        }
+
+        /* Utility Classes */
+        .text-center { text-align: center; }
+        .text-muted { color: var(--gray-600); }
+        .mb-1 { margin-bottom: 0.5rem; }
+        .mb-2 { margin-bottom: 1rem; }
+        .mt-1 { margin-top: 0.5rem; }
+        .mt-2 { margin-top: 1rem; }
+        .d-flex { display: flex; }
+        .align-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .w-100 { width: 100%; }
+
+        /* System Messages */
+        .system-alert {
+            background: #fffbeb;
+            border: 1px solid #fbbf24;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            color: #92400e;
+        }
+
+        .error-alert {
+            background: #fef2f2;
+            border: 1px solid var(--danger);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-stethoscope"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>MedAI Assistant</h1>
+                    <p>AI-powered medical consultation with curriculum learning</p>
+                </div>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span id="agentStatus">System Ready</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Chat Section -->
+            <section class="chat-section">
+                <div class="chat-header">
+                    <h2><i class="fas fa-comments"></i> Medical Consultation</h2>
+                </div>
+                
+                <div id="chat">
+                    <div class="system-alert">
+                        <strong><i class="fas fa-info-circle"></i> Important Notice:</strong><br>
+                        This AI assistant uses curriculum learning to provide medical consultations. It starts with basic questions and progressively handles complex medical scenarios.<br>
+                        <strong>Disclaimer:</strong> This system is for educational purposes only. Always consult a qualified healthcare professional for medical advice.
+                    </div>
+                </div>
+                
+                <div class="input-section">
+                    <div class="input-group">
+                        <input type="text" id="messageInput" placeholder="Type your medical question here..." disabled>
+                        <button id="sendBtn" class="btn btn-primary" disabled>
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                        <button id="clearBtn" class="btn btn-secondary">
+                            <i class="fas fa-trash"></i> Clear
+                        </button>
+                    </div>
+
+                    <div class="vqa-panel">
+                        <div class="vqa-header">
+                            <i class="fas fa-image"></i> Visual Question Answering (VQA)
+                        </div>
+                        <div class="file-upload">
+                            <label class="file-label">
+                                <i class="fas fa-upload"></i> Upload Medical Image
+                                <input type="file" id="vqaImageInput" class="file-input" accept="image/*">
+                            </label>
+                        </div>
+                        
+                        <div class="image-preview" id="vqaPreviewContainer">
+                            <div class="preview-container">
+                                <img id="vqaPreviewImage" alt="Medical image preview">
+                                <button type="button" id="clearVqaImageBtn" class="remove-image">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="input-group mt-2">
+                            <input type="text" id="vqaQuestionInput" class="w-100" placeholder="Ask a question about the image...">
+                            <button id="vqaSendBtn" class="btn btn-primary" disabled>
+                                <i class="fas fa-search"></i> Analyze
+                            </button>
+                        </div>
+                        <div class="text-muted text-center mt-1" id="vqaStatus">No image selected</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <!-- Curriculum Progress -->
+                <div class="stats-card">
+                    <h3><i class="fas fa-graduation-cap"></i> Curriculum Progress</h3>
+                    <div class="progress-container">
+                        <div class="progress-label">
+                            <span>Iteration <span id="iteration">0</span>/<span id="maxIterations">100</span></span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="progressFill" class="progress-fill" style="width: 0%; background: linear-gradient(90deg, var(--primary), var(--secondary));"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Difficulty Distribution -->
+                <div class="stats-card">
+                    <h3><i class="fas fa-chart-bar"></i> Difficulty Distribution</h3>
+                    <div class="mb-2">
+                        <div class="progress-label">
+                            <span>Trivial</span>
+                            <span id="trivialProb">25%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="trivialBar" class="progress-fill" style="width: 25%; background: var(--success);"></div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="progress-label">
+                            <span>Easy</span>
+                            <span id="easyProb">25%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="easyBar" class="progress-fill" style="width: 25%; background: var(--info);"></div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="progress-label">
+                            <span>Medium</span>
+                            <span id="mediumProb">25%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="mediumBar" class="progress-fill" style="width: 25%; background: var(--warning);"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="progress-label">
+                            <span>Hard</span>
+                            <span id="hardProb">25%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="hardBar" class="progress-fill" style="width: 25%; background: var(--danger);"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current Consultation -->
+                <div class="stats-card">
+                    <h3><i class="fas fa-clipboard-check"></i> Current Consultation</h3>
+                    <div class="d-flex align-center justify-between mb-2">
+                        <span class="text-muted">Domain:</span>
+                        <span id="currentDomain" class="domain-tag">-</span>
+                    </div>
+                    <div class="d-flex align-center justify-between mb-2">
+                        <span class="text-muted">Difficulty:</span>
+                        <span id="currentDifficulty" class="badge badge-easy">-</span>
+                    </div>
+                    <div class="confidence-indicator">
+                        <span class="text-muted">Confidence:</span>
+                        <span id="currentConfidence">-</span>
+                        <div class="confidence-bar">
+                            <div id="confidenceLevel" class="confidence-level" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <div class="text-muted mb-1">Specialists Consulted:</div>
+                        <div id="specialistsList" class="specialist-chips"></div>
+                    </div>
+                </div>
+
+                <!-- Session Stats & Controls -->
+                <div class="stats-card">
+                    <h3><i class="fas fa-cogs"></i> System Controls</h3>
+                    <div class="controls">
+                        <button id="resetBtn" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-redo"></i> Reset Curriculum
+                        </button>
+                        <button id="exportBtn" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-download"></i> Export Chat
+                        </button>
+                    </div>
+                    
+                    <div class="session-info">
+                        <div><strong>Session ID:</strong> <span id="sessionId">default</span></div>
+                        <div class="mt-1"><strong>Total Queries:</strong> <span id="totalQueries">0</span></div>
+                        <div><strong>Avg Confidence:</strong> <span id="avgConfidence">0%</span></div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <script>
+        class MedicalAgentInterface {
+            constructor() {
+                this.sessionId = 'medical_session_' + Date.now();
+                this.conversationHistory = [];
+                this.totalQueries = 0;
+                this.confidenceHistory = [];
+                this.domainHistory = [];
+                
+                this.initializeElements();
+                this.initializeEventListeners();
+                this.initializeSystem();
+            }
+
+            initializeElements() {
+                this.chatContainer = document.getElementById('chat');
+                this.messageInput = document.getElementById('messageInput');
+                this.sendBtn = document.getElementById('sendBtn');
+                this.clearBtn = document.getElementById('clearBtn');
+                this.resetBtn = document.getElementById('resetBtn');
+                this.exportBtn = document.getElementById('exportBtn');
+
+                this.vqaImageInput = document.getElementById('vqaImageInput');
+                this.vqaQuestionInput = document.getElementById('vqaQuestionInput');
+                this.vqaSendBtn = document.getElementById('vqaSendBtn');
+                this.vqaStatus = document.getElementById('vqaStatus');
+                this.vqaPreviewContainer = document.getElementById('vqaPreviewContainer');
+                this.vqaPreviewImage = document.getElementById('vqaPreviewImage');
+                this.clearVqaImageBtn = document.getElementById('clearVqaImageBtn');
+
+                this.vqaImageFile = null;
+                this.vqaImageDataUrl = '';
+                this.vqaLoading = false;
+            }
+
+            initializeEventListeners() {
+                this.sendBtn.addEventListener('click', () => this.sendMessage());
+                this.clearBtn.addEventListener('click', () => this.clearConversation());
+                this.resetBtn.addEventListener('click', () => this.resetCurriculum());
+                this.exportBtn.addEventListener('click', () => this.exportConversation());
+                
+                this.messageInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+
+                if (this.vqaImageInput) {
+                    this.vqaImageInput.addEventListener('change', (event) => this.handleImageSelection(event));
+                }
+                if (this.vqaQuestionInput) {
+                    this.vqaQuestionInput.addEventListener('input', () => this.toggleVqaButton());
+                }
+                if (this.vqaSendBtn) {
+                    this.vqaSendBtn.addEventListener('click', () => this.sendVqaRequest());
+                }
+                if (this.clearVqaImageBtn) {
+                    this.clearVqaImageBtn.addEventListener('click', () => this.clearSelectedImage());
+                }
+            }
+
+            async initializeSystem() {
+                try {
+                    await this.updateCurriculumStatus();
+                    this.enableInterface();
+                    this.addSystemMessage('Medical agent initialized successfully. Ask any medical question.');
+                    document.getElementById('sessionId').textContent = this.sessionId.split('_')[2];
+                } catch (error) {
+                    this.addErrorMessage('Failed to initialize medical agent: ' + error.message);
+                }
+            }
+
+            enableInterface() {
+                this.messageInput.disabled = false;
+                this.sendBtn.disabled = false;
+                this.messageInput.focus();
+                const statusEl = document.getElementById('agentStatus');
+                if (statusEl) {
+                    statusEl.innerHTML = 'Agent Ready';
+                }
+            }
+
+            async sendMessage() {
+                const message = this.messageInput.value.trim();
+                if (!message) return;
+
+                this.messageInput.value = '';
+                this.setLoading(true);
+                this.addMessage('user', message);
+
+                try {
+                    const response = await fetch('/api/medical_chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: message,
+                            session_id: this.sessionId
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+
+                    this.addMessage('agent', data.response, data.metadata);
+                    this.updateStats(data.metadata, data.session_stats);
+                    await this.updateCurriculumStatus();
+
+                } catch (error) {
+                    this.addErrorMessage('Consultation failed: ' + error.message);
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+
+            async uploadImageToMedGemma() {
+                const fileInput = document.getElementById('imageUpload');
+                const file = fileInput.files[0];
+                if (!file) {
+                    this.addErrorMessage('Please select an image to upload');
+                    return;
+                }
+
+                this.setLoading(true);
+
+                try {
+                    const form = new FormData();
+                    form.append('image', file);
+                    form.append('message', 'Describe this image in one sentence.');
+
+                    const resp = await fetch('/api/medgemma_infer', {
+                        method: 'POST',
+                        body: form
+                    });
+
+                    if (!resp.ok) {
+                        const text = await resp.text();
+                        throw new Error(text || `HTTP ${resp.status}`);
+                    }
+
+                    const data = await resp.json();
+                    if (data.error) throw new Error(data.error);
+
+                    this.addMessage('agent', data.response, { confidence: 0.8, difficulty_level: 'easy', domain: 'radiology', specialists_consulted: [], retrieved_context: [] });
+                } catch (e) {
+                    this.addErrorMessage('Image inference failed: ' + e.message);
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+
+            addMessage(role, content, metadata = null, messageType = 'text') {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${role}-message`;
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+
+                if (metadata && metadata.vqa) {
+                    const vqaBadge = document.createElement('div');
+                    vqaBadge.className = 'vqa-badge';
+                    vqaBadge.textContent = `MedGemma VQA - ${metadata.model || ''}`.trim();
+                    contentDiv.appendChild(vqaBadge);
+                }
+
+                if (metadata && role === 'agent') {
+                    metadata.specialists_consulted = metadata.specialists_consulted || [];
+                    metadata.retrieved_context = metadata.retrieved_context || [];
+
+                    // Add difficulty badge
+                    const difficultyBadge = document.createElement('div');
+                    difficultyBadge.className = `difficulty-badge ${metadata.difficulty_level}`;
+                    difficultyBadge.textContent = metadata.difficulty_level.toUpperCase();
+                    contentDiv.appendChild(difficultyBadge);
+
+                    // Add domain badge
+                    const domainBadge = document.createElement('span');
+                    domainBadge.className = 'domain-badge';
+                    domainBadge.textContent = metadata.domain.toUpperCase();
+                    contentDiv.appendChild(domainBadge);
+
+                    contentDiv.appendChild(document.createElement('br'));
+                    contentDiv.appendChild(document.createElement('br'));
+                }
+
+                this.renderMarkdown(contentDiv, content);
+
+                // Add metadata for agent responses
+                if (metadata && role === 'agent') {
+                    const metadataDiv = document.createElement('div');
+                    metadataDiv.className = 'message-metadata';
+                    
+                    const items = [
+                        `Confidence: ${Math.round(metadata.confidence * 100)}%`,
+                        `Specialists: ${metadata.specialists_consulted.length}`,
+                        `Retrieved: ${metadata.retrieved_context.length} docs`
+                    ];
+
+                    items.forEach(item => {
+                        const span = document.createElement('span');
+                        span.className = 'metadata-item';
+                        span.textContent = item;
+                        metadataDiv.appendChild(span);
+                    });
+
+                    contentDiv.appendChild(metadataDiv);
+
+                    if (
+                        Array.isArray(metadata.retrieved_context) &&
+                        metadata.retrieved_context.length > 0 &&
+                        typeof metadata.retrieved_context[0] === 'object'
+                    ) {
+                        const contextList = document.createElement('div');
+                        contextList.style.marginTop = '8px';
+                        contextList.style.fontSize = '0.85em';
+                        contextList.style.color = '#495057';
+
+                        metadata.retrieved_context.forEach(doc => {
+                            const docDiv = document.createElement('div');
+                            docDiv.textContent = `- ${doc.title} (${doc.domain})`;
+                            contextList.appendChild(docDiv);
+                        });
+
+                        contentDiv.appendChild(contextList);
+                    }
+                }
+
+                messageDiv.appendChild(contentDiv);
+                this.chatContainer.appendChild(messageDiv);
+                this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+
+                // Store in history
+                this.conversationHistory.push({ role, content, metadata, type: messageType, timestamp: new Date() });
+            }
+
+            renderMarkdown(container, markdown) {
+                if (!markdown) {
+                    return;
+                }
+                const lines = markdown.split(/\n/);
+                let currentList = null;
+
+                const flushList = () => {
+                    if (currentList) {
+                        container.appendChild(currentList);
+                        currentList = null;
+                    }
+                };
+
+                lines.forEach((line, index) => {
+                    const trimmed = line.trim();
+                    if (/^[-*]\s+/.test(trimmed)) {
+                        if (!currentList) {
+                            currentList = document.createElement('ul');
+                        }
+                        const li = document.createElement('li');
+                        li.innerHTML = this.formatInlineMarkdown(trimmed.replace(/^[-*]\s+/, ''));
+                        currentList.appendChild(li);
+                    } else if (trimmed === '') {
+                        flushList();
+                        if (index !== lines.length - 1) {
+                            container.appendChild(document.createElement('br'));
+                        }
+                    } else {
+                        flushList();
+                        const p = document.createElement('p');
+                        p.innerHTML = this.formatInlineMarkdown(line);
+                        container.appendChild(p);
+                    }
+                });
+
+                flushList();
+            }
+
+            formatInlineMarkdown(text = '') {
+                let formatted = this.escapeHtml(text);
+                formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+                formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                formatted = formatted.replace(/(^|\s)\*([^*]+)\*(?=\s|$)/g, (match, prefix, value) => `${prefix}<em>${value}</em>`);
+                return formatted;
+            }
+
+            escapeHtml(text = '') {
+                return String(text)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            }
+
+            addImageMessage(role, question, imageSrc) {
+                if (!imageSrc) {
+                    return;
+                }
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${role}-message`;
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+
+                const label = document.createElement('div');
+                label.className = 'vqa-label';
+                label.textContent = role === 'user' ? 'Image Question' : 'Image';
+                contentDiv.appendChild(label);
+
+                if (question) {
+                    const questionText = document.createElement('div');
+                    questionText.style.marginBottom = '10px';
+                    questionText.textContent = question;
+                    contentDiv.appendChild(questionText);
+                }
+
+                const img = document.createElement('img');
+                img.src = imageSrc;
+                img.alt = 'Medical image';
+                img.className = 'chat-image';
+                contentDiv.appendChild(img);
+
+                messageDiv.appendChild(contentDiv);
+                this.chatContainer.appendChild(messageDiv);
+                this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+
+                this.conversationHistory.push({
+                    role,
+                    content: question,
+                    image: imageSrc,
+                    type: 'vqa-image',
+                    timestamp: new Date()
+                });
+            }
+
+            handleImageSelection(event) {
+                const [file] = event.target.files;
+                if (!file) {
+                    this.clearSelectedImage();
+                    return;
+                }
+
+                if (!file.type.startsWith('image/')) {
+                    this.setVqaStatus('Unsupported file format. Please upload an image.', true);
+                    this.clearSelectedImage();
+                    return;
+                }
+
+                this.vqaImageFile = file;
+                const reader = new FileReader();
+                reader.onload = () => {
+                    this.vqaImageDataUrl = reader.result;
+                    this.vqaPreviewImage.src = reader.result;
+                    this.vqaPreviewContainer.classList.add('visible');
+                    this.vqaPreviewContainer.removeAttribute('hidden');
+                    this.setVqaStatus(`Selected: ${file.name}`);
+                    this.toggleVqaButton();
+                };
+                reader.onerror = () => {
+                    this.setVqaStatus('Failed to read the selected image.', true);
+                    this.clearSelectedImage();
+                };
+                reader.readAsDataURL(file);
+            }
+
+            clearSelectedImage() {
+                this.vqaImageFile = null;
+                this.vqaImageDataUrl = '';
+                if (this.vqaImageInput) {
+                    this.vqaImageInput.value = '';
+                }
+                if (this.vqaPreviewContainer) {
+                    this.vqaPreviewContainer.classList.remove('visible');
+                    this.vqaPreviewContainer.setAttribute('hidden', 'hidden');
+                }
+                if (this.vqaPreviewImage) {
+                    this.vqaPreviewImage.src = '';
+                }
+                this.setVqaStatus('No image selected.');
+                this.toggleVqaButton();
+            }
+
+            setVqaStatus(message, isError = false) {
+                if (!this.vqaStatus) {
+                    return;
+                }
+                this.vqaStatus.textContent = message;
+                this.vqaStatus.style.color = isError ? '#c0392b' : '#4f5d75';
+            }
+
+            toggleVqaButton() {
+                if (!this.vqaSendBtn) {
+                    return;
+                }
+                const hasQuestion = this.vqaQuestionInput && this.vqaQuestionInput.value.trim().length > 0;
+                this.vqaSendBtn.disabled = this.vqaLoading || !this.vqaImageFile || !hasQuestion;
+            }
+
+            setVqaLoading(isLoading) {
+                this.vqaLoading = isLoading;
+                if (this.vqaSendBtn) {
+                    this.vqaSendBtn.textContent = isLoading ? 'Analyzing...' : 'Ask About Image';
+                }
+                if (this.vqaQuestionInput) {
+                    this.vqaQuestionInput.disabled = isLoading;
+                }
+                if (this.vqaImageInput) {
+                    this.vqaImageInput.disabled = isLoading;
+                }
+                this.toggleVqaButton();
+            }
+
+            async sendVqaRequest() {
+                if (!this.vqaImageFile || !this.vqaQuestionInput) {
+                    return;
+                }
+
+                const question = this.vqaQuestionInput.value.trim();
+                if (!question) {
+                    this.setVqaStatus('Please enter a question for the selected image.', true);
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('question', question);
+                formData.append('image', this.vqaImageFile, this.vqaImageFile.name || 'image.png');
+
+                const previewSrc = this.vqaImageDataUrl || (this.vqaPreviewImage ? this.vqaPreviewImage.src : '');
+                if (previewSrc) {
+                    this.addImageMessage('user', question, previewSrc);
+                } else {
+                    this.addMessage('user', question, null, 'vqa');
+                }
+
+                this.setVqaLoading(true);
+                this.setVqaStatus('Submitting image for analysis...');
+
+                try {
+                    const response = await fetch('/api/vqa', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
+                    }
+
+                    const data = await response.json();
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+
+                    const metadata = {
+                        difficulty_level: data.difficulty_level || 'medium',
+                        domain: data.domain || 'general',
+                        confidence: 0.55,
+                        specialists_consulted: [],
+                        retrieved_context: data.retrieved_context || [],
+                        vqa: true,
+                        model: data.model || 'MedGemma'
+                    };
+
+                    this.addMessage('agent', data.answer || 'No answer provided.', metadata, 'vqa');
+
+                    const sessionStats = {
+                        total_queries: this.totalQueries + 1,
+                        conversation_length: this.conversationHistory.length
+                    };
+
+                    this.updateStats(metadata, sessionStats);
+                    this.totalQueries = sessionStats.total_queries;
+
+                    this.setVqaStatus('VQA response generated successfully.');
+                    this.vqaQuestionInput.value = '';
+                } catch (error) {
+                    this.addErrorMessage('VQA failed: ' + error.message);
+                    this.setVqaStatus(error.message, true);
+                } finally {
+                    this.setVqaLoading(false);
+                    this.toggleVqaButton();
+                }
+            }
+
+            addSystemMessage(content) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'system-message';
+                messageDiv.innerHTML = content;
+                this.chatContainer.appendChild(messageDiv);
+                this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+            }
+
+            addErrorMessage(content) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'error-message';
+                messageDiv.textContent = 'Error: ' + content;
+                this.chatContainer.appendChild(messageDiv);
+                this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+            }
+
+            updateStats(metadata, sessionStats) {
+                // Update current consultation info
+                const domainEl = document.getElementById('currentDomain');
+                if (domainEl) {
+                    domainEl.textContent = metadata.domain;
+                }
+
+                const difficultyEl = document.getElementById('currentDifficulty');
+                if (difficultyEl) {
+                    difficultyEl.textContent = metadata.difficulty_level;
+                }
+
+                const confidenceTextEl = document.getElementById('currentConfidence');
+                if (confidenceTextEl) {
+                    confidenceTextEl.textContent = Math.round(metadata.confidence * 100) + '%';
+                }
+                
+                // Update confidence meter
+                const confidenceBar = document.getElementById('confidenceLevel') || document.getElementById('confidenceFill');
+                if (confidenceBar) {
+                    confidenceBar.style.width = (metadata.confidence * 100) + '%';
+                }
+
+                // Update specialists list
+                const specialistsList = document.getElementById('specialistsList');
+                if (specialistsList) {
+                    specialistsList.innerHTML = '';
+                    metadata.specialists_consulted.forEach(specialist => {
+                        const chip = document.createElement('span');
+                        chip.className = 'specialist-chip';
+                        chip.textContent = specialist;
+                        specialistsList.appendChild(chip);
+                    });
+                }
+
+                // Update session statistics
+                this.totalQueries = sessionStats.total_queries;
+                this.confidenceHistory.push(metadata.confidence);
+                this.domainHistory.push(metadata.domain);
+
+                const totalQueriesEl = document.getElementById('totalQueries');
+                if (totalQueriesEl) {
+                    totalQueriesEl.textContent = this.totalQueries;
+                }
+
+                const conversationLengthEl = document.getElementById('conversationLength');
+                if (conversationLengthEl) {
+                    conversationLengthEl.textContent = sessionStats.conversation_length;
+                }
+                
+                const avgConfidence = this.confidenceHistory.reduce((a, b) => a + b, 0) / this.confidenceHistory.length;
+                const avgConfidenceEl = document.getElementById('avgConfidence');
+                if (avgConfidenceEl) {
+                    avgConfidenceEl.textContent = Math.round(avgConfidence * 100) + '%';
+                }
+
+                // Most common domain
+                const domainCounts = this.domainHistory.reduce((acc, domain) => {
+                    acc[domain] = (acc[domain] || 0) + 1;
+                    return acc;
+                }, {});
+                const mostCommon = Object.keys(domainCounts).reduce((a, b) => 
+                    domainCounts[a] > domainCounts[b] ? a : b, 'general'
+                );
+                const commonDomainEl = document.getElementById('commonDomain');
+                if (commonDomainEl) {
+                    commonDomainEl.textContent = mostCommon;
+                }
+            }
+
+            async updateCurriculumStatus() {
+                try {
+                    const response = await fetch('/api/curriculum_status');
+                    if (response.ok) {
+                        const status = await response.json();
+                        
+                        const iterationEl = document.getElementById('iteration');
+                        if (iterationEl) {
+                            iterationEl.textContent = status.iteration;
+                        }
+
+                        const maxIterationsEl = document.getElementById('maxIterations');
+                        if (maxIterationsEl) {
+                            maxIterationsEl.textContent = status.max_iterations;
+                        }
+                        
+                        const progress = (status.iteration / status.max_iterations) * 100;
+                        const progressFill = document.getElementById('progressFill');
+                        if (progressFill) {
+                            progressFill.style.width = progress + '%';
+                        }
+
+                        // Update difficulty distribution
+                        for (const [level, prob] of Object.entries(status.difficulty_distribution)) {
+                            const percentage = Math.round(prob * 100);
+                            const probEl = document.getElementById(`${level}Prob`);
+                            if (probEl) {
+                                probEl.textContent = percentage + '%';
+                            }
+                            const barEl = document.getElementById(`${level}Bar`);
+                            if (barEl) {
+                                barEl.style.width = percentage + '%';
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to update curriculum status:', error);
+                }
+            }
+
+            async clearConversation() {
+                if (confirm('Clear conversation history?')) {
+                    try {
+                        await fetch(`/api/clear_memory/${this.sessionId}`, { method: 'POST' });
+                        this.chatContainer.innerHTML = '';
+                        this.conversationHistory = [];
+                        this.addSystemMessage('Conversation cleared. How can I help you?');
+                    } catch (error) {
+                        this.addErrorMessage('Failed to clear conversation: ' + error.message);
+                    }
+                }
+            }
+
+            async resetCurriculum() {
+                if (confirm('Reset curriculum progress? This will restart the learning progression.')) {
+                    try {
+                        await fetch('/api/reset_curriculum', { method: 'POST' });
+                        await this.updateCurriculumStatus();
+                        this.addSystemMessage('Curriculum progress reset. Starting fresh learning cycle.');
+                    } catch (error) {
+                        this.addErrorMessage('Failed to reset curriculum: ' + error.message);
+                    }
+                }
+            }
+
+            exportConversation() {
+                const exportData = {
+                    session_id: this.sessionId,
+                    timestamp: new Date().toISOString(),
+                    conversation_history: this.conversationHistory,
+                    statistics: {
+                        total_queries: this.totalQueries,
+                        avg_confidence: this.confidenceHistory.reduce((a, b) => a + b, 0) / this.confidenceHistory.length,
+                        domain_distribution: this.domainHistory.reduce((acc, domain) => {
+                            acc[domain] = (acc[domain] || 0) + 1;
+                            return acc;
+                        }, {})
+                    }
+                };
+
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `medical_consultation_${this.sessionId}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            setLoading(isLoading) {
+                this.sendBtn.disabled = isLoading;
+                this.messageInput.disabled = isLoading;
+                
+                if (isLoading) {
+                    this.sendBtn.textContent = 'Processing...';
+                    this.chatContainer.classList.add('loading');
+                    const statusEl = document.getElementById('agentStatus');
+                    if (statusEl) {
+                        statusEl.innerHTML = 'Consulting...';
+                    }
+                } else {
+                    this.sendBtn.textContent = 'Send';
+                    this.chatContainer.classList.remove('loading');
+                    const statusEl = document.getElementById('agentStatus');
+                    if (statusEl) {
+                        statusEl.innerHTML = 'Agent Ready';
+                    }
+                    this.messageInput.focus();
+                }
+            }
+        }
+
+        // Initialize the medical agent interface
+        document.addEventListener('DOMContentLoaded', () => {
+            new MedicalAgentInterface();
+        });
+    </script>
+</body>
+</html>

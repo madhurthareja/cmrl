@@ -1,0 +1,29 @@
+# Python dependencies for Flask E2H Curriculum Agent
+flask==2.3.3
+flask-cors==4.0.0
+asgiref>=3.7.2
+google-generativeai==0.3.2
+python-dotenv==1.0.0
+gunicorn==21.2.0
+numpy
+sentence_transformers
+torch
+faiss-cpu
+requests>=2.31.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+
+# VLM Finetuning Dependencies
+transformers>=4.35.0
+datasets>=2.14.0
+accelerate>=0.24.0
+peft>=0.6.0
+bitsandbytes>=0.41.0
+pillow>=10.0.0
+timm>=0.9.0
+wandb>=0.15.0
+deepspeed>=0.12.0
+scipy
+scikit-learn
