@@ -30,12 +30,34 @@ medical_agent = None
 medgemma_client = MedGemmaVQAClient(
     MedGemmaConfig(
         base_url=os.environ.get('MEDGEMMA_BASE_URL', 'http://localhost:8000'),
-        model_name=os.environ.get('MEDGEMMA_MODEL', 'medgemma-4b-it_Q4_K_M')
+        model_name=os.environ.get('MEDGEMMA_MODEL', 'medgemma-4b-it_Q4_K_M'),
+        api_key=os.environ.get('MEDGEMMA_API_KEY') or os.environ.get('LLAMA_API_KEY'),
     )
 )
 
 # Conversation memory
 conversation_memory = {}
+
+
+def _get_session_state(session_id: str):
+    """Ensure a session bucket exists for the given session_id."""
+    session_key = session_id or 'default'
+    if session_key not in conversation_memory:
+        conversation_memory[session_key] = {
+            'messages': [],
+            'context': '',
+            'total_queries': 0
+        }
+    return conversation_memory[session_key]
+
+
+def _build_history_context(messages, limit: int = 6) -> str:
+    """Build a compact textual summary of the last few turns."""
+    recent_messages = messages[-limit:]
+    return "\n".join(
+        f"Previous {msg.get('role', 'user')}: {msg.get('content', '')}"
+        for msg in recent_messages
+    )
 
 
 def _serialize_retrieved_docs(docs, limit: int = 3):
@@ -60,75 +82,105 @@ def index():
 async def medical_chat():
     """Handle medical consultation requests"""
     try:
-        data = request.get_json()
-        user_message = data.get('message', '')
+        data = request.get_json() or {}
+        user_message = (data.get('message') or '').strip()
         session_id = data.get('session_id', 'default')
-        
+
         if not user_message:
             return jsonify({'error': 'No message provided'}), 400
-        
-        if medical_agent is None:
-            return jsonify({'error': 'Medical agent not initialized'}), 500
-        
-        # Initialize conversation memory for session
-        if session_id not in conversation_memory:
-            conversation_memory[session_id] = {
-                'messages': [],
-                'context': '',
-                'total_queries': 0
+
+        if medgemma_client is None:
+            return jsonify({'error': 'MedGemma client unavailable'}), 500
+
+        session_state = _get_session_state(session_id)
+
+        timestamp = datetime.now().isoformat()
+        session_state['messages'].append(
+            {
+                'role': 'user',
+                'content': user_message,
+                'timestamp': timestamp,
             }
-        
-        # Add user message to memory
-        conversation_memory[session_id]['messages'].append({
-            'role': 'user',
-            'content': user_message,
-            'timestamp': datetime.now().isoformat()
-        })
-        
-        # Build context from conversation history
-        context = "\n".join([
-            f"Previous {msg['role']}: {msg['content']}" 
-            for msg in conversation_memory[session_id]['messages'][-5:]  # Last 5 messages
-        ])
-        
-        # Process medical query
-        response = await medical_agent.process_medical_query(user_message, context)
-        
-        # Add response to memory
-        conversation_memory[session_id]['messages'].append({
-            'role': 'assistant',
-            'content': response.answer,
-            'metadata': {
-                'domain': response.domain.value,
-                'difficulty': response.difficulty_level.value,
-                'confidence': response.confidence,
-                'specialists': [cons.specialist_type for cons in response.specialist_consultations],
-                'retrieved_docs': len(response.retrieved_context)
-            },
-            'timestamp': datetime.now().isoformat()
-        })
-        
-        conversation_memory[session_id]['total_queries'] += 1
-        
-        # Get curriculum status
-        curriculum_status = medical_agent.get_curriculum_status()
-        
-        return jsonify({
-            'response': response.answer,
-            'metadata': {
-                'domain': response.domain.value,
-                'difficulty_level': response.difficulty_level.value,
-                'confidence': response.confidence,
-                'reasoning': response.reasoning[:500] + "..." if len(response.reasoning) > 500 else response.reasoning,
-                'specialists_consulted': [cons.specialist_type for cons in response.specialist_consultations],
-                'retrieved_context': response.retrieved_context,
-                'curriculum_status': curriculum_status
-            },
-            'session_stats': {
-                'total_queries': conversation_memory[session_id]['total_queries'],
-                'conversation_length': len(conversation_memory[session_id]['messages'])
+        )
+
+        history_context = _build_history_context(session_state['messages'])
+
+        domain = MedicalDomain.GENERAL
+        difficulty = DifficultyLevel.MEDIUM
+        retrieved_docs = []
+        rag_context = ''
+
+        if medical_agent is not None:
+            try:
+                domain = medical_agent.triage_agent.domain_classifier.classify_domain(user_message)
+                difficulty = medical_agent.difficulty_classifier.classify_difficulty_level(user_message)
+                retrieved_docs = await medical_agent.rag_system.retrieve_with_curriculum(
+                    user_message,
+                    domain,
+                    difficulty,
+                )
+                rag_context = "\n".join(
+                    f"{doc.title}: {doc.content[:400]}" for doc in retrieved_docs[:3]
+                )
+            except Exception as retrieval_error:  # pragma: no cover - diagnostic logging
+                logger.warning("Chat retrieval fallback: %s", retrieval_error)
+                retrieved_docs = []
+                rag_context = ''
+
+        combined_context_parts = [history_context.strip(), rag_context.strip()]
+        combined_context = "\n\n".join(part for part in combined_context_parts if part)
+
+        medgemma_response = await medgemma_client.generate_text_response_async(
+            user_message,
+            context=combined_context if combined_context else None,
+        )
+
+        answer_text = medgemma_response.get('answer', '').strip()
+        if not answer_text:
+            raise RuntimeError('MedGemma returned an empty answer')
+
+        confidence = 0.65 + (0.05 if retrieved_docs else 0.0)
+        assistant_metadata = {
+            'domain': domain.value,
+            'difficulty_level': difficulty.value,
+            'confidence': round(min(confidence, 0.92), 2),
+            'reasoning': (
+                'Generated by MedGemma with recent conversation context and retrieved notes.'
+            ),
+            'specialists_consulted': [],
+            'retrieved_context': _serialize_retrieved_docs(retrieved_docs),
+            'model': medgemma_response.get('model', medgemma_client.config.model_name),
+            'usage': medgemma_response.get('usage', {}),
+        }
+
+        session_state['messages'].append(
+            {
+                'role': 'assistant',
+                'content': answer_text,
+                'metadata': assistant_metadata,
+                'timestamp': datetime.now().isoformat(),
             }
-        })
+        )
+        session_state['total_queries'] += 1
+        session_state['context'] = combined_context
+
+        curriculum_status = (
+            medical_agent.get_curriculum_status() if medical_agent is not None else None
+        )
+        assistant_metadata['curriculum_status'] = curriculum_status or {}
+
+        session_stats = {
+            'total_queries': session_state['total_queries'],
+            'conversation_length': len(session_state['messages']),
+        }
+
+        return jsonify(
+            {
+                'response': answer_text,
+                'metadata': assistant_metadata,
+                'session_stats': session_stats,
+            }
+        )
         
     except Exception as e:
         logger.error(f"Error in medical chat: {e}")
@@ -249,6 +301,13 @@ async def medical_vqa():
         if medgemma_client is None:
             return jsonify({'error': 'MedGemma client unavailable'}), 500
 
+        session_id = (
+            request.form.get('session_id')
+            or request.args.get('session_id')
+            or 'default'
+        )
+        session_state = _get_session_state(session_id)
+
         if 'image' not in request.files:
             return jsonify({'error': 'No image uploaded'}), 400
 
@@ -290,14 +349,55 @@ async def medical_vqa():
             context=context_snippets if context_snippets else None,
         )
 
+        answer_text = model_response.get('answer', '').strip()
+        if not answer_text:
+            raise RuntimeError('MedGemma returned an empty answer')
+        confidence = 0.62 + (0.06 if retrieved_docs else 0.0)
+
+        assistant_metadata = {
+            'domain': domain.value,
+            'difficulty_level': difficulty.value,
+            'confidence': round(min(confidence, 0.93), 2),
+            'retrieved_context': _serialize_retrieved_docs(retrieved_docs),
+            'model': model_response.get('model', medgemma_client.config.model_name),
+            'usage': model_response.get('usage', {}),
+            'vqa': True,
+        }
+
+        session_state['messages'].extend(
+            [
+                {
+                    'role': 'user',
+                    'content': f"[Image Question] {question}",
+                    'metadata': {'type': 'vqa', 'mime_type': mime_type},
+                    'timestamp': datetime.now().isoformat(),
+                },
+                {
+                    'role': 'assistant',
+                    'content': f"[Image Analysis] {answer_text}",
+                    'metadata': assistant_metadata,
+                    'timestamp': datetime.now().isoformat(),
+                },
+            ]
+        )
+        session_state['total_queries'] += 1
+        session_state['context'] = _build_history_context(session_state['messages'])
+
+        session_stats = {
+            'total_queries': session_state['total_queries'],
+            'conversation_length': len(session_state['messages']),
+        }
+
         return jsonify(
             {
-                'answer': model_response.get('answer', '').strip(),
-                'model': model_response.get('model'),
-                'usage': model_response.get('usage', {}),
+                'answer': answer_text,
+                'model': assistant_metadata['model'],
+                'usage': assistant_metadata['usage'],
                 'domain': domain.value,
                 'difficulty_level': difficulty.value,
-                'retrieved_context': _serialize_retrieved_docs(retrieved_docs),
+                'confidence': assistant_metadata['confidence'],
+                'retrieved_context': assistant_metadata['retrieved_context'],
+                'session_stats': session_stats,
             }
         )
 
