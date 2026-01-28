@@ -345,7 +345,7 @@ class MockLLM:
 
 if __name__ == "__main__":
     # Test GRPO implementation (smoke test)
-    from backend.agents.medical_agent_core import RewardCalculator
+    from agents.medical_agent_core import RewardCalculator
 
     # Initialize components
     mock_model = MockLLM()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 import logging
 from functools import partial
 from dataclasses import dataclass
@@ -65,12 +66,15 @@ class MedGemmaVQAClient:
             headers["Authorization"] = f"Bearer {self.config.api_key}"
 
         try:
+            logger.info(f"Sending payload to MedGemma: {json.dumps(payload, indent=2)}")
             response = self._session.post(
                 url,
                 json=payload,
                 headers=headers if headers else None,
                 timeout=self.config.timeout,
             )
+            if response.status_code != 200:
+                logger.error(f"MedGemma Error Response: {response.text}")
             response.raise_for_status()
         except requests.RequestException as exc:  # pragma: no cover - network failure
             logger.error("MedGemma request failed: %s", exc)
@@ -131,8 +135,8 @@ class MedGemmaVQAClient:
 
         user_segments.extend(
             [
-                {"type": "text", "text": question},
                 {"type": "image_url", "image_url": {"url": image_payload}},
+                {"type": "text", "text": question},
             ]
         )
 
@@ -190,3 +194,28 @@ class MedGemmaVQAClient:
         loop = asyncio.get_running_loop()
         bound_call = partial(self.generate_text_response, prompt, context=context)
         return await loop.run_in_executor(None, bound_call)
+
+    async def classify_clinical_intent(self, query: str) -> str:
+        """
+        Acts as the 'Attending Triage': Determines if a specific clinical protocol is needed.
+        """
+        prompt = f"""
+        You are a Senior Medical Officer performing triage.
+        Patient Query: "{query}"
+
+        Determine if this case requires activating specific clinical protocols.
+        
+        Options:
+        - CHEST_PAIN: Acute chest pain, angina, possible MI.
+        - GENERAL: Routine questions, general advice, unknown conditions.
+
+        Return ONLY the option name (CHEST_PAIN or GENERAL). Do not explain.
+        """
+        
+        # We use a very low temperature for classification stability
+        response_data = await self.generate_text_response_async(prompt)
+        response_text = response_data.get('answer', '').upper()
+        
+        if "CHEST_PAIN" in response_text:
+            return "CHEST_PAIN"
+        return "GENERAL"

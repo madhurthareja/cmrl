@@ -9,7 +9,7 @@ import sys
 import os
 
 def main():
-    print("Starting E2H Medical Agent System...")
+    print("Starting Medical Agent System...")
     print("Web interface will be available at: http://localhost:5001")
     
     # Run the Flask app from the backend directory
@@ -21,7 +21,7 @@ def main():
             sys.executable, 'medical_agent_app.py'
         ], cwd=backend_path, check=True)
     except KeyboardInterrupt:
-        print("\nShutting down E2H Medical Agent System...")
+        print("\nShutting down Medical Agent System...")
     except subprocess.CalledProcessError as e:
         print(f"Error starting system: {e}")
 

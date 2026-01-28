@@ -60,37 +60,52 @@ Response payloads are sent back to the browser, which updates chat history, conf
 3. **Download the MedGemma GGUF + projector**
 
         ```bash
-        mkdir -p models/gguf && cd models/gguf
+        mkdir -p ~/models/medgemma-gguf
+        cd ~/models/medgemma-gguf
         wget https://huggingface.co/SandLogicTechnologies/MedGemma-4B-IT-GGUF/resolve/main/medgemma-4b-it-Q4_K_M.gguf
-        wget https://huggingface.co/SandLogicTechnologies/MedGemma-4B-IT-GGUF/resolve/main/mmproj-medgemma-4b-f16.gguf
-        cd ../..
+        wget https://huggingface.co/SandLogicTechnologies/MedGemma-4B-IT-GGUF/resolve/main/mmproj-medgemma-4b-f16.gguf \
+             -O mmproj-medgemma-4b-it-F16.gguf
+        cd -
         ```
 
         - Use `medgemma-4b-it-Q4_K_M.gguf` on 4–6 GB GPUs (RTX 3050 friendly). Swap in `Q5_K_M` for more quality if VRAM allows.
-        - The `mmproj` file is required for vision inputs.
+        - The `mmproj` file is required for vision inputs; rename it however you prefer, just match the path in the server command.
 
-4. **Run the llama.cpp server (OpenAI-compatible)**
+4. **Build llama.cpp once (native server)**
 
         ```bash
-        ./llama-server \
-          -m models/gguf/medgemma-4b-it-Q4_K_M.gguf \
-          --mmproj models/gguf/mmproj-medgemma-4b-f16.gguf \
-          --host 0.0.0.0 --port 8000 \
-          --ctx-size 4096 --n-gpu-layers 35 --threads 8
+        git clone https://github.com/ggerganov/llama.cpp.git ~/llama.cpp
+        cd ~/llama.cpp
+        cmake -S . -B build -DLLAMA_CUBLAS=ON   # drop the flag for pure CPU builds
+        cmake --build build -j $(nproc)
         ```
 
-        Keep this terminal running; it exposes `http://localhost:8000/v1/chat/completions`.
+        - `-DLLAMA_CUBLAS=ON` enables CUDA acceleration; replace with `LLAMA_CLBLAST`/`LLAMA_METAL` if you target other GPUs.
+        - The build step produces `~/llama.cpp/build/bin/llama-server`, which exposes an OpenAI-compatible API.
 
-5. **Start the Flask backend** (new terminal)
+5. **Run the llama.cpp server**
+
+        ```bash
+        ~/llama.cpp/build/bin/llama-server \
+          --model ~/models/medgemma-gguf/medgemma-4b-it_Q4_K_M.gguf \
+          --mmproj ~/models/medgemma-gguf/mmproj-medgemma-4b-it-F16.gguf \
+          --port 8000 \
+          --host 0.0.0.0
+        ```
+
+        Keep this terminal running; it exposes `http://localhost:8000/v1/chat/completions`. Add `--api-key YOUR_KEY` here if you want to require authentication.
+
+6. **Start the Flask backend** (new terminal)
 
         ```bash
         source venv/bin/activate
         export FLASK_ENV=development               # optional, enables hot reload
-        export VLLM_URL=http://localhost:8000/v1/chat/completions
+        export MEDGEMMA_BASE_URL=http://localhost:8000
+        # export MEDGEMMA_API_KEY=YOUR_KEY         # only needed if llama-server used --api-key
         python backend/medical_agent_app.py
         ```
 
-6. **Open the UI**
+7. **Open the UI**
 
         Visit `http://127.0.0.1:5001` and try either text chat or the “Ask About Image” workflow.
 
@@ -102,12 +117,13 @@ The MedGemma client reads its config from `backend/models/medgemma_vqa.py`:
 medgemma_client = MedGemmaVQAClient(
          MedGemmaConfig(
                   base_url=os.environ.get('MEDGEMMA_BASE_URL', 'http://localhost:8000'),
-                  model_name=os.environ.get('MEDGEMMA_MODEL', 'medgemma-4b-it_Q4_K_M')
+                  model_name=os.environ.get('MEDGEMMA_MODEL', 'medgemma-4b-it_Q4_K_M'),
+                  api_key=os.environ.get('MEDGEMMA_API_KEY')
          )
 )
 ```
 
-- **Different GGUF / remote endpoint:** start llama.cpp (or vLLM) elsewhere and point the backend via `MEDGEMMA_BASE_URL` or `VLLM_URL`.
+- **Different GGUF / remote endpoint:** start `llama-server` on that host and point the backend via `MEDGEMMA_BASE_URL`.
 - **Switch precision (Q4 → Q5) or an entirely different model:** restart the llama server with the new weights and set `MEDGEMMA_MODEL` to the identifier you want to see in responses.
 - **Tweak decoding:** edit the `MedGemmaConfig` fields (`max_tokens`, `temperature`, `top_p`) to match the new model’s sweet spot.
 
@@ -124,6 +140,6 @@ pytest tests/test_medgemma_vqa.py
 
 ## Troubleshooting
 
-- If VQA requests fail with connection errors, ensure the vLLM server is running and reachable.
+- If VQA requests fail with connection errors, ensure `llama-server` is running and reachable at the URL in `MEDGEMMA_BASE_URL`.
 - To adjust MedGemma parameters, edit `MedGemmaConfig` in `backend/models/medgemma_vqa.py` (base URL, model name, decoding limits).
 - For curriculum or retrieval tuning, update the relevant modules under `backend/agents` and `backend/retrieval`.

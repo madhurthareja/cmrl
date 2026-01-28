@@ -1190,6 +1190,7 @@
                 const formData = new FormData();
                 formData.append('question', question);
                 formData.append('image', this.vqaImageFile, this.vqaImageFile.name || 'image.png');
+                formData.append('session_id', this.sessionId);
 
                 const previewSrc = this.vqaImageDataUrl || (this.vqaPreviewImage ? this.vqaPreviewImage.src : '');
                 if (previewSrc) {
@@ -1220,16 +1221,17 @@
                     const metadata = {
                         difficulty_level: data.difficulty_level || 'medium',
                         domain: data.domain || 'general',
-                        confidence: 0.55,
+                        confidence: typeof data.confidence === 'number' ? data.confidence : 0.55,
                         specialists_consulted: [],
                         retrieved_context: data.retrieved_context || [],
                         vqa: true,
-                        model: data.model || 'MedGemma'
+                        model: data.model || 'MedGemma',
+                        usage: data.usage || {}
                     };
 
                     this.addMessage('agent', data.answer || 'No answer provided.', metadata, 'vqa');
 
-                    const sessionStats = {
+                    const sessionStats = data.session_stats || {
                         total_queries: this.totalQueries + 1,
                         conversation_length: this.conversationHistory.length
                     };

@@ -222,15 +222,28 @@ class DomainSpecificRetriever:
 class MultiDomainRAGSystem:
     """Multi-domain RAG system with curriculum learning integration"""
     
-    def __init__(self, corpus_dir: str = "./data/medical_corpus"):
+    def __init__(self, corpus_dir: str = "./data/medical_corpus", lazy_load: bool = True):
         self.corpus_dir = corpus_dir
         self.retrievers = {}
         self.adaptive_retriever = AdaptiveRetriever()
         self.difficulty_classifier = MedicalDifficultyClassifier()
         
-        # Initialize domain-specific retrievers
+        # Initialize domain-specific retrievers lazy loaded
+        self._lazy_load = lazy_load
+        if not self._lazy_load:
+            self._load_all_retrievers()
+
+    def _load_all_retrievers(self):
         for domain in MedicalDomain:
-            self.retrievers[domain] = DomainSpecificRetriever(domain, corpus_dir)
+            if domain not in self.retrievers:
+                self.retrievers[domain] = DomainSpecificRetriever(domain, self.corpus_dir)
+
+    def _get_retriever(self, domain: MedicalDomain):
+        if domain not in self.retrievers:
+            # Check if we should load all or just this one? 
+            # For this context, just load the one we need if lazy
+            self.retrievers[domain] = DomainSpecificRetriever(domain, self.corpus_dir)
+        return self.retrievers[domain]
     
     async def retrieve_with_curriculum(
         self, 
@@ -242,11 +255,16 @@ class MultiDomainRAGSystem:
         """Retrieve documents with curriculum-aware filtering"""
         
         # Get base retrieval results
-        retriever = self.retrievers.get(domain, self.retrievers[MedicalDomain.GENERAL])
+        retriever = self._get_retriever(domain) if domain in self.retrievers or self._lazy_load else self._get_retriever(MedicalDomain.GENERAL)
+        # If still not found (e.g. domain mismatch), fallback
+        if domain not in self.retrievers and not self._lazy_load: # Should not happen if loaded
+             retriever = self.retrievers[MedicalDomain.GENERAL]
+             
         retrieved_docs = await retriever.retrieve(query, k=k)
         
         # Apply curriculum filtering
         curriculum_filtered = self.apply_curriculum_filter(retrieved_docs, curriculum_level)
+
         
         # Adaptive k-selection
         final_docs = self.adaptive_retriever.adaptive_truncate(curriculum_filtered)
