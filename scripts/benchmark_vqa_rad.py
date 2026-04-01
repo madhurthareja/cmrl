@@ -19,7 +19,6 @@ sys.path.append(root_dir)
 sys.path.append(os.path.join(root_dir, 'backend'))
 
 from backend.models.medgemma_vqa import MedGemmaVQAClient, MedGemmaConfig
-from backend.agents.e2h_medical_agent import E2HMedicalAgent
 
 # Logging setup
 logging.basicConfig(
@@ -38,13 +37,9 @@ class VQARADEvaluator:
         self.medgemma_config = MedGemmaConfig(base_url=self.medgemma_url)
         self.limit = limit
         
-        # Initialize Agent (Symbiotic Pipeline)
-        self.agent = E2HMedicalAgent() 
-        # Override config if needed, though default usually works
-        
         # Load Dataset
         logger.info("Loading VQA-RAD dataset...")
-        self.dataset = load_dataset("flaviagiammarino/vqa-rad", split="test", trust_remote_code=True)
+        self.dataset = load_dataset("flaviagiammarino/vqa-rad", split="test")
         if self.limit:
             self.dataset = self.dataset.select(range(self.limit))
         logger.info(f"Loaded {len(self.dataset)} samples.")
@@ -96,65 +91,30 @@ class VQARADEvaluator:
         # 1. Convert Image
         image_bytes = self._pil_to_bytes(image)
         
-        # 2. VQA Step (Attending) - Get Visual Findings directly first
-        # We need to construct the context for the agent manually if we want to ensure
-        # the agent uses the specific image finding.
-        # However, E2HMedicalAgent.process_medical_query usually takes text query.
-        # It doesn't natively take an image... wait.
-        # Let's check E2HMedicalAgent.process_medical_query signature.
-        
-        # If E2HMedicalAgent doesn't take an image, we must run MedGemma first
-        # and pass findings as context.
-        # Checking `backend/agents/e2h_medical_agent.py`... I suspect it's text-only.
-        # Let's verify this assumption.
-        
-        # Direct call to MedGemma (Visual Analysis)
+        # MedGemma path: perform visual analysis and final answer in one pass.
         vqa_client = MedGemmaVQAClient(self.medgemma_config)
-        
-        # Visual Prompt
-        visual_prompt = (
-            f"Analyze this medical image for the question: '{question}'. "
-            "List only objective clinical findings."
+
+        answer_prompt = (
+            f"Question: {question}\n"
+            "Provide a clinically grounded answer based on the image. "
+            "If the question is yes/no, begin with Yes or No. "
+            "If uncertain due to modality limits, state uncertainty briefly."
         )
         
         try:
             vqa_response = await vqa_client.answer_question_async(
                 image_bytes=image_bytes,
-                question=visual_prompt
+                question=answer_prompt
             )
-            visual_findings = vqa_response.get("answer", "")
+            prediction = vqa_response.get("answer", "")
         except Exception as e:
             logger.error(f"VQA Error: {e}")
-            visual_findings = "Error analyzing image."
-
-        # 3. Agent Reasoning (Symbolic + Guidelines)
-        # We inject the visual findings into the agent's context
-        # Convert dictionary to string to comply with E2HMedicalAgent interface
-        agent_context_str = (
-            f"Visual Findings: {visual_findings}\n"
-            f"Patient History: No history provided.\n"
-            f"Intent: diagnostic_investigation"
-        )
-        
-        # For closed questions (Yes/No), the agent produces verbose output.
-        # We append a specific instruction for brevity if possible, 
-        # or just parse the verbose output.
-        agent_query = f"{question} based on these visual findings: {visual_findings}"
-        
-        try:
-            agent_response = await self.agent.process_medical_query(agent_query, context=agent_context_str)
-            prediction = agent_response.answer
-        except Exception as e:
-            logger.error(f"Agent Error: {e}")
-            import traceback
-            traceback.print_exc()
             prediction = "Error in reasoning."
 
         score = self.score_answer(prediction, str(truth), type_)
         
         return {
             "question": question,
-            "visual_findings": visual_findings,
             "truth": str(truth),
             "prediction": prediction,
             "score": score,

@@ -189,7 +189,7 @@ class MedGemmaVQAClient:
         *,
         context: Optional[str] = None,
     ) -> Dict:
-        """Async helper for MedGemma text-only generations."""
+        """Async helper for MedGemma generations."""
 
         loop = asyncio.get_running_loop()
         bound_call = partial(self.generate_text_response, prompt, context=context)

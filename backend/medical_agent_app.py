@@ -12,7 +12,6 @@ import os
 from werkzeug.utils import secure_filename
 import requests
 
-from agents.e2h_medical_agent import E2HMedicalAgent
 from agents.medical_agent_core import DifficultyLevel, MedicalDomain
 from models.medgemma_vqa import MedGemmaVQAClient, MedGemmaConfig
 
@@ -25,7 +24,7 @@ app = Flask(__name__,
            static_folder='../frontend/static')
 CORS(app)
 
-# Global agent instance
+# Pipeline mode: MedGemma only
 medical_agent = None
 medgemma_client = MedGemmaVQAClient(
     MedGemmaConfig(
@@ -37,6 +36,122 @@ medgemma_client = MedGemmaVQAClient(
 
 # Conversation memory
 conversation_memory = {}
+
+
+def _extract_json_object(text: str):
+    """Best-effort JSON extraction from model text."""
+    if not text:
+        return None
+
+    cleaned = text.strip().replace("```json", "").replace("```", "")
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        pass
+
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        snippet = cleaned[start:end + 1]
+        try:
+            return json.loads(snippet)
+        except Exception:
+            return None
+    return None
+
+
+def _to_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "1", "yes", "y"}
+    return bool(value)
+
+
+def _to_float_01(value, default: float = 0.5) -> float:
+    try:
+        parsed = float(value)
+    except Exception:
+        parsed = default
+    return max(0.0, min(1.0, parsed))
+
+
+def _normalize_clinical_payload(raw_text: str) -> dict:
+    """Normalize model output into a stable clinical contract payload."""
+    parsed = _extract_json_object(raw_text)
+    if not isinstance(parsed, dict):
+        return {
+            "json_valid": False,
+            "direct_answer": raw_text.strip() if raw_text else "",
+            "task_answer": "not_applicable",
+            "confidence": 0.5,
+            "evidence_strength": "moderate",
+            "modality_limits_acknowledged": False,
+            "escalation_needed": False,
+            "recommended_next_step": "",
+            "reasoning": "",
+            "raw": raw_text or "",
+        }
+
+    task_answer = str(parsed.get("task_answer", "not_applicable")).strip().lower()
+    if task_answer not in {"yes", "no", "indeterminate", "not_applicable"}:
+        task_answer = "not_applicable"
+
+    evidence_strength = str(parsed.get("evidence_strength", "moderate")).strip().lower()
+    if evidence_strength not in {"weak", "moderate", "strong"}:
+        evidence_strength = "moderate"
+
+    return {
+        "json_valid": True,
+        "direct_answer": str(parsed.get("direct_answer", "")).strip(),
+        "task_answer": task_answer,
+        "confidence": _to_float_01(parsed.get("confidence", 0.5), default=0.5),
+        "evidence_strength": evidence_strength,
+        "modality_limits_acknowledged": _to_bool(parsed.get("modality_limits_acknowledged", False)),
+        "escalation_needed": _to_bool(parsed.get("escalation_needed", False)),
+        "recommended_next_step": str(parsed.get("recommended_next_step", "")).strip(),
+        "reasoning": str(parsed.get("reasoning", "")).strip(),
+        "raw": raw_text or "",
+    }
+
+
+def _build_clinical_prompt(question: str, context: str = "", for_vqa: bool = False) -> str:
+    mode_hint = "image-grounded" if for_vqa else "text-grounded"
+    context_block = f"Context:\n{context}\n\n" if context else ""
+    return (
+        f"You are a {mode_hint} clinical assistant.\n"
+        f"{context_block}"
+        f"Question: {question}\n"
+        "Return valid JSON only with EXACT keys:\n"
+        "direct_answer, task_answer, confidence, evidence_strength, modality_limits_acknowledged, escalation_needed, recommended_next_step, reasoning\n"
+        "Rules:\n"
+        "- task_answer: yes|no|indeterminate|not_applicable\n"
+        "- confidence: float between 0 and 1\n"
+        "- evidence_strength: weak|moderate|strong\n"
+        "- modality_limits_acknowledged: true|false\n"
+        "- escalation_needed: true|false\n"
+        "- direct_answer should be concise and clinically useful"
+    )
+
+
+def _epistemic_gate(payload: dict) -> dict:
+    """Heuristic neuro-symbolic checks over structured output."""
+    confidence = _to_float_01(payload.get("confidence", 0.5), default=0.5)
+    evidence_strength = str(payload.get("evidence_strength", "moderate")).lower()
+    escalation_needed = _to_bool(payload.get("escalation_needed", False))
+    modality_ack = _to_bool(payload.get("modality_limits_acknowledged", False))
+
+    unsupported_certainty = 1.0 if (confidence >= 0.85 and evidence_strength == "weak") else 0.0
+    escalation_mismatch = 1.0 if (confidence >= 0.85 and evidence_strength == "strong" and escalation_needed) else 0.0
+    modality_mismatch = 1.0 if ((not modality_ack) and confidence >= 0.8) else 0.0
+
+    penalty = (unsupported_certainty + escalation_mismatch + modality_mismatch) / 3.0
+    return {
+        "unsupported_certainty_flag": unsupported_certainty,
+        "escalation_mismatch_flag": escalation_mismatch,
+        "modality_mismatch_flag": modality_mismatch,
+        "epistemic_validity": 1.0 - penalty,
+    }
 
 
 def _get_session_state(session_id: str):
@@ -110,47 +225,41 @@ async def medical_chat():
         retrieved_docs = []
         rag_context = ''
 
-        if medical_agent is not None:
-            try:
-                domain = medical_agent.triage_agent.domain_classifier.classify_domain(user_message)
-                difficulty = medical_agent.difficulty_classifier.classify_difficulty_level(user_message)
-                retrieved_docs = await medical_agent.rag_system.retrieve_with_curriculum(
-                    user_message,
-                    domain,
-                    difficulty,
-                )
-                rag_context = "\n".join(
-                    f"{doc.title}: {doc.content[:400]}" for doc in retrieved_docs[:3]
-                )
-            except Exception as retrieval_error:  # pragma: no cover - diagnostic logging
-                logger.warning("Chat retrieval fallback: %s", retrieval_error)
-                retrieved_docs = []
-                rag_context = ''
-
         combined_context_parts = [history_context.strip(), rag_context.strip()]
         combined_context = "\n\n".join(part for part in combined_context_parts if part)
 
-        medgemma_response = await medgemma_client.generate_text_response_async(
+        structured_prompt = _build_clinical_prompt(
             user_message,
+            context=combined_context if combined_context else "",
+            for_vqa=False,
+        )
+
+        medgemma_response = await medgemma_client.generate_text_response_async(
+            structured_prompt,
             context=combined_context if combined_context else None,
         )
 
-        answer_text = medgemma_response.get('answer', '').strip()
+        raw_answer = medgemma_response.get('answer', '').strip()
+        payload = _normalize_clinical_payload(raw_answer)
+        gate = _epistemic_gate(payload)
+
+        answer_text = payload.get('direct_answer', '').strip() or raw_answer
         if not answer_text:
             raise RuntimeError('MedGemma returned an empty answer')
 
-        confidence = 0.65 + (0.05 if retrieved_docs else 0.0)
+        confidence = payload.get('confidence', 0.65)
         assistant_metadata = {
             'domain': domain.value,
             'difficulty_level': difficulty.value,
             'confidence': round(min(confidence, 0.92), 2),
-            'reasoning': (
-                'Generated by MedGemma with recent conversation context and retrieved notes.'
-            ),
+            'reasoning': payload.get('reasoning') or 'Generated by MedGemma with structured contract.',
             'specialists_consulted': [],
             'retrieved_context': _serialize_retrieved_docs(retrieved_docs),
             'model': medgemma_response.get('model', medgemma_client.config.model_name),
             'usage': medgemma_response.get('usage', {}),
+            'structured_output': payload,
+            'epistemic_gate': gate,
+            'contract_version': 'clinical-v1',
         }
 
         session_state['messages'].append(
@@ -164,10 +273,7 @@ async def medical_chat():
         session_state['total_queries'] += 1
         session_state['context'] = combined_context
 
-        curriculum_status = (
-            medical_agent.get_curriculum_status() if medical_agent is not None else None
-        )
-        assistant_metadata['curriculum_status'] = curriculum_status or {}
+        assistant_metadata['curriculum_status'] = {}
 
         session_stats = {
             'total_queries': session_state['total_queries'],
@@ -283,11 +389,7 @@ def medgemma_infer():
 def get_curriculum_status():
     """Get current curriculum learning status"""
     try:
-        if medical_agent is None:
-            return jsonify({'error': 'Medical agent not initialized'}), 500
-        
-        status = medical_agent.get_curriculum_status()
-        return jsonify(status)
+        return jsonify({'status': 'disabled', 'reason': 'MedGemma-only mode does not use curriculum scheduler'})
         
     except Exception as e:
         logger.error(f"Error getting curriculum status: {e}")
@@ -325,34 +427,25 @@ async def medical_vqa():
         domain = MedicalDomain.GENERAL
         difficulty = DifficultyLevel.MEDIUM
         retrieved_docs = []
+        context_snippets = ''
 
-        if medical_agent is not None:
-            try:
-                # Estimate domain/difficulty from question
-                domain = medical_agent.triage_agent.domain_classifier.classify_domain(question)
-                difficulty = medical_agent.difficulty_classifier.classify_difficulty_level(question)
-                retrieved_docs = await medical_agent.rag_system.retrieve_with_curriculum(
-                    question, domain, difficulty
-                )
-            except Exception as retrieval_error:  # pragma: no cover - fallback path
-                logger.warning("VQA retrieval fallback: %s", retrieval_error)
-                retrieved_docs = []
-
-        context_snippets = "\n".join(
-            f"{doc.title}: {doc.content[:400]}" for doc in retrieved_docs[:3]
-        )
+        structured_prompt = _build_clinical_prompt(question, context=context_snippets, for_vqa=True)
 
         model_response = await medgemma_client.answer_question_async(
             image_bytes,
-            question,
+            structured_prompt,
             mime_type=mime_type,
             context=context_snippets if context_snippets else None,
         )
 
-        answer_text = model_response.get('answer', '').strip()
+        raw_answer = model_response.get('answer', '').strip()
+        payload = _normalize_clinical_payload(raw_answer)
+        gate = _epistemic_gate(payload)
+
+        answer_text = payload.get('direct_answer', '').strip() or raw_answer
         if not answer_text:
             raise RuntimeError('MedGemma returned an empty answer')
-        confidence = 0.62 + (0.06 if retrieved_docs else 0.0)
+        confidence = payload.get('confidence', 0.62)
 
         assistant_metadata = {
             'domain': domain.value,
@@ -362,6 +455,9 @@ async def medical_vqa():
             'model': model_response.get('model', medgemma_client.config.model_name),
             'usage': model_response.get('usage', {}),
             'vqa': True,
+            'structured_output': payload,
+            'epistemic_gate': gate,
+            'contract_version': 'clinical-v1',
         }
 
         session_state['messages'].extend(
@@ -397,6 +493,8 @@ async def medical_vqa():
                 'difficulty_level': difficulty.value,
                 'confidence': assistant_metadata['confidence'],
                 'retrieved_context': assistant_metadata['retrieved_context'],
+                'structured_output': payload,
+                'epistemic_gate': gate,
                 'session_stats': session_stats,
             }
         )
@@ -410,11 +508,7 @@ async def medical_vqa():
 def reset_curriculum():
     """Reset curriculum progress"""
     try:
-        if medical_agent is None:
-            return jsonify({'error': 'Medical agent not initialized'}), 500
-        
-        medical_agent.curriculum_scheduler.iteration = 0
-        return jsonify({'status': 'Curriculum reset successfully'})
+        return jsonify({'status': 'disabled', 'reason': 'MedGemma-only mode does not use curriculum scheduler'})
         
     except Exception as e:
         logger.error(f"Error resetting curriculum: {e}")
@@ -463,37 +557,19 @@ def get_difficulty_levels():
 async def train_model():
     """Train the medical agent with provided data"""
     try:
-        data = request.get_json()
-        training_examples = data.get('training_examples', [])
-        
-        if not training_examples:
-            return jsonify({'error': 'No training examples provided'}), 400
-        
-        if medical_agent is None:
-            return jsonify({'error': 'Medical agent not initialized'}), 500
-        
-        # Convert training examples to expected format
-        training_data = [(ex['question'], ex['answer']) for ex in training_examples]
-        
-        # Run training
-        results = await medical_agent.train_with_curriculum(training_data)
-        
-        return jsonify({
-            'status': 'Training completed',
-            'results': results
-        })
+        return jsonify({'status': 'disabled', 'reason': 'Training endpoint is unavailable in MedGemma-only mode'}), 400
         
     except Exception as e:
         logger.error(f"Error in model training: {e}")
         return jsonify({'error': f'Training failed: {str(e)}'}), 500
 
 async def init_medical_agent():
-    """Initialize the medical agent asynchronously"""
+    """Initialize MedGemma-only runtime."""
     global medical_agent
     try:
-        print("Initializing E2H Medical Agent...")
-        medical_agent = E2HMedicalAgent()
-        print("Medical Agent initialized successfully.")
+        print("Initializing MedGemma-only pipeline...")
+        medical_agent = None
+        print("MedGemma-only pipeline initialized successfully.")
         return True
     except Exception as e:
         print(f"Failed to initialize medical agent: {e}")
@@ -524,7 +600,7 @@ if __name__ == '__main__':
     success = loop.run_until_complete(init_medical_agent())
     
     if success:
-        logger.info("E2H Medical Agent Flask Server Starting...")
+        logger.info("MedGemma Flask Server Starting...")
         app.run(debug=True, host='0.0.0.0', port=5001, threaded=True)
     else:
         logger.error("Failed to initialize medical agent. Exiting.")

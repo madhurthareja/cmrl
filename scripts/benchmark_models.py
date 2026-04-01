@@ -2,10 +2,9 @@ import os
 import sys
 import asyncio
 import time
-import string
 import logging
+import json
 import pandas as pd
-import numpy as np
 import nltk
 import re
 from datasets import load_dataset
@@ -26,91 +25,120 @@ sys.path.append(root_dir)
 sys.path.append(os.path.join(root_dir, 'backend'))
 
 from backend.models.medgemma_vqa import MedGemmaVQAClient, MedGemmaConfig
-from backend.agents.e2h_medical_agent import E2HMedicalAgent
-from backend.agents.llm_interface import OllamaLLMInterface
-from backend.retrieval.pubmed_service import PubMedService
 
 # Logging
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class BaselineRAGAgent:
-    """
-    Baseline Agent that uses Visual Findings -> PubMed Search -> LLM Generation.
-    """
-    def __init__(self, model_name="qwen3:1.7b"):
-        self.llm = OllamaLLMInterface(model_name=model_name)
-        self.pubmed = PubMedService()
-        self.name = "Baseline_RAG"
+class MedGemmaAgent:
+    """Single-model medical benchmark agent using MedGemma."""
 
-    async def answer(self, question: str, visual_findings: str) -> str:
-        # Search PubMed
-        search_query = f"{question} {visual_findings}"[:100]
-        pmids = self.pubmed.search(search_query, retmax=3)
-        abstracts = []
-        if pmids:
-            details = self.pubmed.fetch_details(pmids)
-            for d in details:
-                if d.get('abstract'):
-                    abstracts.append(d['abstract'][:300])
-        
-        context = "\n".join(abstracts)
-        
+    def __init__(self, medgemma_config: MedGemmaConfig):
+        self.client = MedGemmaVQAClient(medgemma_config)
+        self.name = "MedGemma"
+
+    def _extract_json(self, text: str):
+        """Best-effort JSON extraction from model output."""
+        if not text:
+            return None
+
+        cleaned = text.strip().replace("```json", "").replace("```", "")
+        # First try direct parse
+        try:
+            return json.loads(cleaned)
+        except Exception:
+            pass
+
+        # Fallback: find first balanced JSON object
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            snippet = cleaned[start:end + 1]
+            try:
+                return json.loads(snippet)
+            except Exception:
+                return None
+        return None
+
+    async def answer(self, image_bytes: bytes, question: str):
         prompt = (
-            f"You are a medical assistant performing a VQA task. \n"
-            f"Visual Findings: {visual_findings}\n"
-            f"Literature Context: {context}\n"
+            "You are a medical VQA specialist.\n"
             f"Question: {question}\n"
-            f"Instruction: Answer the question directly. If it is a Yes/No question, start with Yes or No. Be concise.\n"
-            f"Answer:"
+            "Return output as valid JSON (no markdown) with EXACT keys:\n"
+            "direct_answer, task_answer, confidence, evidence_strength, modality_limits_acknowledged, escalation_needed, recommended_next_step, reasoning\n"
+            "Rules:\n"
+            "- task_answer must be one of: yes, no, indeterminate, not_applicable\n"
+            "- confidence must be a float between 0 and 1\n"
+            "- evidence_strength must be one of: weak, moderate, strong\n"
+            "- modality_limits_acknowledged must be true/false\n"
+            "- escalation_needed must be true/false\n"
+            "- direct_answer should be concise and clinically grounded\n"
+            "- reasoning should be short and factual"
         )
-        
-        response = await self.llm.generate(prompt, temperature=0.1)
-        return response
+        response = await self.client.answer_question_async(image_bytes=image_bytes, question=prompt)
+        answer = response.get("answer", "")
+        parsed = self._extract_json(answer)
 
-class ZeroShotAgent:
-    """
-    Simple Zero-Shot Agent: Visual Findings -> LLM -> Answer.
-    """
-    def __init__(self, model_name="qwen3:1.7b"):
-        self.llm = OllamaLLMInterface(model_name=model_name)
-        self.name = "Zero_Shot"
+        if isinstance(parsed, dict):
+            return {
+                "raw": answer,
+                "direct_answer": str(parsed.get("direct_answer", "")).strip(),
+                "task_answer": str(parsed.get("task_answer", "not_applicable")).strip().lower(),
+                "confidence": parsed.get("confidence", 0.5),
+                "evidence_strength": str(parsed.get("evidence_strength", "moderate")).strip().lower(),
+                "modality_limits_acknowledged": bool(parsed.get("modality_limits_acknowledged", False)),
+                "escalation_needed": bool(parsed.get("escalation_needed", False)),
+                "recommended_next_step": str(parsed.get("recommended_next_step", "")).strip(),
+                "reasoning": str(parsed.get("reasoning", "")).strip(),
+                "json_valid": True,
+            }
 
-    async def answer(self, question: str, visual_findings: str) -> str:
-        prompt = (
-            f"Visual Findings: {visual_findings}\n"
-            f"Question: {question}\n"
-            f"Instruction: Answer the question directly. If it is a Yes/No question, start with Yes or No. Be concise.\n"
-            f"Answer:"
-        )
-        response = await self.llm.generate(prompt, temperature=0.1)
-        return response
+        # Fallback keeps benchmark robust even if model returns plain text.
+        return {
+            "raw": answer,
+            "direct_answer": answer,
+            "task_answer": "not_applicable",
+            "confidence": 0.5,
+            "evidence_strength": "moderate",
+            "modality_limits_acknowledged": False,
+            "escalation_needed": False,
+            "recommended_next_step": "",
+            "reasoning": "",
+            "json_valid": False,
+        }
 
 class ModelBenchmark:
     def __init__(self, limit=None):
         self.limit = limit
         self.medgemma_config = MedGemmaConfig(base_url="http://localhost:8000")
-        
-        # Initialize Models
-        self.models = [
-            E2HMedicalAgent(),      # Proposed
-            BaselineRAGAgent(),     # Baseline with PubMed
-            ZeroShotAgent()         # Baseline without PubMed
-        ]
+        self.model = MedGemmaAgent(self.medgemma_config)
         
         # Initialize Metrics Models
         print("Loading Semantic Similarity Model (all-MiniLM-L6-v2)...")
         self.sim_model = SentenceTransformer('all-MiniLM-L6-v2')
         self.bleu_smooth = SmoothingFunction().method1
 
-    async def get_visual_findings(self, image_bytes, question):
-        vqa_client = MedGemmaVQAClient(self.medgemma_config)
-        prompt = f"Analyze this medical image for the question: '{question}'. List only objective clinical findings."
-        try:
-            resp = await vqa_client.answer_question_async(image_bytes=image_bytes, question=prompt)
-            return resp.get("answer", "No findings.")
-        except:
-            return "Error retrieving findings."
+    def extract_structured_answer(self, prediction: str, q_type: str):
+        if q_type != "CLOSED":
+            return None
+
+        pred_norm = self.clean_text(prediction)
+        words = pred_norm.split()
+        head = words[:12]
+        if "yes" in head:
+            return "yes"
+        if "no" in head:
+            return "no"
+        if "indeterminate" in words or "uncertain" in words or "cannot" in head:
+            return "indeterminate"
+        return None
+
+    def normalize_structured_answer(self, task_answer: str, q_type: str):
+        if q_type != "CLOSED":
+            return None
+        if task_answer in ["yes", "no", "indeterminate"]:
+            return task_answer
+        return None
 
     def clean_text(self, text):
         text = str(text).lower().strip()
@@ -120,7 +148,7 @@ class ModelBenchmark:
         text = re.sub(r'[^\w\s]', ' ', text)
         return " ".join(text.split())
 
-    def compute_metrics(self, pred, truth, q_type, structured_answer=None):
+    def compute_metrics(self, pred, truth, q_type, structured_answer=None, meta=None):
         pred_norm = self.clean_text(pred)
         truth_norm = self.clean_text(truth)
         
@@ -162,15 +190,82 @@ class ModelBenchmark:
             mas = 1.0
         metrics['modality_awareness'] = mas
 
-        # 3. Exact Match (Legacy/Surface)
+        # 3. Binary Task Compliance (BTC): schema compliance for CLOSED tasks.
+        btc = 0.0
+        if q_type == "CLOSED" and structured_answer in ["yes", "no", "indeterminate"]:
+            btc = 1.0
+        metrics['binary_task_compliance'] = btc
+
+        # 4. Epistemic Gate checks (heuristic neuro-symbolic validation).
+        contradiction = 0.0
+        unsupported_certainty = 0.0
+        escalation_mismatch = 0.0
+        modality_mismatch = 0.0
+
+        if meta is not None:
+            confidence = float(meta.get("confidence", 0.5))
+            evidence_strength = str(meta.get("evidence_strength", "moderate")).lower()
+            escalation_needed = bool(meta.get("escalation_needed", False))
+            modality_ack = bool(meta.get("modality_limits_acknowledged", False))
+
+            # Detect answer polarity contradiction between structured and free text head.
+            inferred = self.extract_structured_answer(pred, q_type)
+            if q_type == "CLOSED" and structured_answer in ["yes", "no"] and inferred in ["yes", "no"]:
+                if structured_answer != inferred:
+                    contradiction = 1.0
+
+            # High confidence with weak evidence is epistemically suspicious.
+            if confidence >= 0.85 and evidence_strength == "weak":
+                unsupported_certainty = 1.0
+
+            # Strong confidence + strong evidence should not always escalate.
+            if confidence >= 0.85 and evidence_strength == "strong" and escalation_needed:
+                escalation_mismatch = 1.0
+
+            # If modality limits are ignored while strong certainty language appears.
+            certainty_words = ["definitive", "certain", "confirmed", "conclusive"]
+            if (not modality_ack) and any(w in pred_norm for w in certainty_words) and q_type == "CLOSED":
+                modality_mismatch = 1.0
+
+        metrics['contradiction_flag'] = contradiction
+        metrics['unsupported_certainty_flag'] = unsupported_certainty
+        metrics['escalation_mismatch_flag'] = escalation_mismatch
+        metrics['modality_mismatch_flag'] = modality_mismatch
+
+        epistemic_penalty = (contradiction + unsupported_certainty + escalation_mismatch + modality_mismatch) / 4.0
+        metrics['epistemic_validity'] = 1.0 - epistemic_penalty
+
+        # 5. Actionability score: escalation should align with uncertainty profile.
+        actionability = 0.5
+        if meta is not None:
+            confidence = float(meta.get("confidence", 0.5))
+            evidence_strength = str(meta.get("evidence_strength", "moderate")).lower()
+            escalation_needed = bool(meta.get("escalation_needed", False))
+
+            if evidence_strength == "weak" or confidence < 0.55:
+                actionability = 1.0 if escalation_needed else 0.0
+            elif evidence_strength == "strong" and confidence >= 0.8:
+                actionability = 1.0 if not escalation_needed else 0.0
+            else:
+                actionability = 0.7
+        metrics['actionability'] = actionability
+
+        # 6. Triadic Reasoning Score (publishable aggregate).
+        metrics['triadic_reasoning_score'] = (
+            0.45 * metrics['binary_truth_alignment']
+            + 0.35 * metrics['epistemic_validity']
+            + 0.20 * metrics['actionability']
+        )
+
+        # 7. Exact Match (Legacy/Surface)
         metrics['exact_match'] = bta # For now, BTA replaces Exact Match functionality but helps sorting
 
-        # 4. Semantic Similarity
+        # 8. Semantic Similarity
         emb1 = self.sim_model.encode(pred_norm, convert_to_tensor=True)
         emb2 = self.sim_model.encode(truth_norm, convert_to_tensor=True)
         metrics['semantic_sim'] = float(util.cos_sim(emb1, emb2)[0][0])
         
-        # 5. BLEU Score
+        # 9. BLEU Score
         truth_tokens = truth_norm.split()
         pred_tokens = pred_norm.split()
         if len(truth_tokens) > 0:
@@ -181,17 +276,14 @@ class ModelBenchmark:
         return metrics
 
     async def run(self):
-        dataset = load_dataset("flaviagiammarino/vqa-rad", split="test", trust_remote_code=True)
+        dataset = load_dataset("flaviagiammarino/vqa-rad", split="test")
         # Filter for quality samples if needed, or just take first N
         if self.limit:
             dataset = dataset.select(range(self.limit))
             
         results = []
         
-        print(f"Starting Multi-Model Benchmark on {len(dataset)} samples...")
-        
-        # Cache visual findings
-        cached_findings = {}
+        print(f"Starting MedGemma Benchmark on {len(dataset)} samples...")
         
         for i, sample in tqdm(enumerate(dataset), total=len(dataset)):
             question = sample['question']
@@ -205,52 +297,70 @@ class ModelBenchmark:
             img.save(buf, format='JPEG')
             img_bytes = buf.getvalue()
             
-            if i not in cached_findings:
-                cached_findings[i] = await self.get_visual_findings(img_bytes, question)
-            visual_findings = cached_findings[i]
-            
-            # 2. Evaluate Models
-            for model in self.models:
-                model_name = getattr(model, 'name', 'Triagic_Curriculum_Symbolic')
-                structured_answer = None
+            try:
+                start_time = time.time()
+                model_out = await self.model.answer(img_bytes, question)
+                latency = time.time() - start_time
 
-                try:
-                    start_time = time.time()
-                    if isinstance(model, E2HMedicalAgent):
-                        # Construct context string for E2H
-                        ctx = f"Visual Findings: {visual_findings}\nIntent: diagnostic_investigation"
-                        query = f"{question}. Findings: {visual_findings}"
-                        resp = await model.process_medical_query(query, context=ctx)
-                        # Extract answer from the elaborate report if possible
-                        prediction = resp.answer
-                        # Access the structured field
-                        try:
-                            structured_answer = resp.structured_answer
-                        except:
-                            structured_answer = None
-                    else:
-                        prediction = await model.answer(question, visual_findings)
-                    latency = time.time() - start_time
-                        
-                    m = self.compute_metrics(prediction, truth, q_type, structured_answer)
-                    
-                    results.append({
-                        "sample_id": i,
-                        "question": question,
-                        "type": q_type,
-                        "truth": truth,
-                        "model": model_name,
-                        "prediction": prediction,
-                        "structured_answer": structured_answer, # Log this
-                        "latency": latency,
-                        "binary_truth_alignment": m['binary_truth_alignment'],
-                        "modality_awareness": m['modality_awareness'],
-                        "semantic_sim": m['semantic_sim'],
-                        "bleu": m['bleu']
-                    })
-                    
-                except Exception as e:
-                    logger.error(f"Error {model_name}: {e}")
+                prediction = model_out.get("direct_answer", "")
+                task_answer = model_out.get("task_answer", "not_applicable")
+                confidence = model_out.get("confidence", 0.5)
+                evidence_strength = model_out.get("evidence_strength", "moderate")
+                modality_limits_ack = model_out.get("modality_limits_acknowledged", False)
+                escalation_needed = model_out.get("escalation_needed", False)
+                recommended_next_step = model_out.get("recommended_next_step", "")
+                reasoning = model_out.get("reasoning", "")
+                json_valid = model_out.get("json_valid", False)
+
+                structured_answer = self.normalize_structured_answer(task_answer, q_type)
+                if structured_answer is None:
+                    structured_answer = self.extract_structured_answer(prediction, q_type)
+
+                m = self.compute_metrics(
+                    prediction,
+                    truth,
+                    q_type,
+                    structured_answer,
+                    meta={
+                        "confidence": confidence,
+                        "evidence_strength": evidence_strength,
+                        "escalation_needed": escalation_needed,
+                        "modality_limits_acknowledged": modality_limits_ack,
+                    }
+                )
+
+                results.append({
+                    "sample_id": i,
+                    "question": question,
+                    "type": q_type,
+                    "truth": truth,
+                    "model": self.model.name,
+                    "prediction": prediction,
+                    "structured_answer": structured_answer,
+                    "json_valid": json_valid,
+                    "task_answer": task_answer,
+                    "confidence": confidence,
+                    "evidence_strength": evidence_strength,
+                    "modality_limits_acknowledged": modality_limits_ack,
+                    "escalation_needed": escalation_needed,
+                    "recommended_next_step": recommended_next_step,
+                    "reasoning": reasoning,
+                    "latency": latency,
+                    "binary_truth_alignment": m['binary_truth_alignment'],
+                    "modality_awareness": m['modality_awareness'],
+                    "binary_task_compliance": m['binary_task_compliance'],
+                    "epistemic_validity": m['epistemic_validity'],
+                    "actionability": m['actionability'],
+                    "triadic_reasoning_score": m['triadic_reasoning_score'],
+                    "contradiction_flag": m['contradiction_flag'],
+                    "unsupported_certainty_flag": m['unsupported_certainty_flag'],
+                    "escalation_mismatch_flag": m['escalation_mismatch_flag'],
+                    "modality_mismatch_flag": m['modality_mismatch_flag'],
+                    "semantic_sim": m['semantic_sim'],
+                    "bleu": m['bleu']
+                })
+            except Exception as e:
+                logger.error(f"Error {self.model.name}: {e}")
                     
             if i % 5 == 0:
                 pd.DataFrame(results).to_csv("multi_model_benchmark_partial.csv", index=False)
@@ -258,11 +368,35 @@ class ModelBenchmark:
         # Final Save
         df = pd.DataFrame(results)
         df.to_csv("multi_model_benchmark_final.csv", index=False)
+
+        if df.empty:
+            print("No successful predictions were generated. Check MedGemma server availability at http://localhost:8000.")
+            return
         
         # Print Summary
         print("\n--- Reasoning Metrics (Layer A & B) ---")
-        reasoning_summary = df.groupby(['model', 'type'])[['binary_truth_alignment', 'modality_awareness']].mean()
+        reasoning_summary = df.groupby(['model', 'type'])[
+            [
+                'binary_truth_alignment',
+                'modality_awareness',
+                'binary_task_compliance',
+                'epistemic_validity',
+                'actionability',
+                'triadic_reasoning_score',
+            ]
+        ].mean()
         print(reasoning_summary)
+
+        print("\n--- Epistemic Gate Diagnostics ---")
+        gate_summary = df.groupby(['model', 'type'])[
+            [
+                'contradiction_flag',
+                'unsupported_certainty_flag',
+                'escalation_mismatch_flag',
+                'modality_mismatch_flag',
+            ]
+        ].mean()
+        print(gate_summary)
         
         print("\n--- Surface Metrics (Legacy) ---")
         surface_summary = df.groupby(['model', 'type'])[['semantic_sim', 'bleu', 'latency']].mean()

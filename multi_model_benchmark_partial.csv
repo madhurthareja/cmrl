@@ -1,5 +1,0 @@
-sample_id,question,type,truth,model,prediction,structured_answer,latency,binary_truth_alignment,modality_awareness,semantic_sim,bleu
-0,is there evidence of an aortic aneurysm?,CLOSED,yes,Triagic_Curriculum_Symbolic,"Visual findings confirm no evidence of an aortic aneurysm. Advanced imaging (e.g., CT angiogram) is required for accurate assessment. Next recommended action: plan for CT angiogram to confirm aortic anatomy.
-Next recommended action: plan for CT angiogram to confirm aortic anatomy. Diagnostic authority confirms chest X-ray is insufficient for detecting aortic aneurysms. Advanced imaging is required for accurate assessment.",no,43.39669108390808,0.0,1.0,-0.023444421589374542,0
-0,is there evidence of an aortic aneurysm?,CLOSED,yes,Baseline_RAG,No,,2.903881549835205,0.0,0.0,0.7334951162338257,0
-0,is there evidence of an aortic aneurysm?,CLOSED,yes,Zero_Shot,No,,1.5926077365875244,0.0,0.0,0.7334951162338257,0

@@ -1,5 +1,11 @@
 .env
 venv
 *.pyc
-*/__pycache__/
+__pycache__/
 .vscode/
+
+# Benchmark and evaluation artifacts
+*.log
+evaluation_report.json
+benchmark_vqa_rad_*.csv
+multi_model_benchmark_*.csv

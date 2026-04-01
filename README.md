@@ -2,7 +2,7 @@
 
 ## Pipeline Overview
 
-The system combines curriculum-aware text consultation with medical visual question answering (VQA). The end-to-end flow is:
+The project now follows a MedGemma-First Clinical Pipeline for both chat and medical VQA. The end-to-end flow is:
 
 ```
 User (text or VQA request)
@@ -13,29 +13,21 @@ User (text or VQA request)
     │
     └── Flask backend (`backend/medical_agent_app.py`)
             │
-            ├─ Domain triage and difficulty prediction (`E2HMedicalAgent`)
-            │       • Uses classifier heads to infer medical specialty and case difficulty
-            │       • Selects curriculum policy and specialist agents
-            │
-            ├─ Retrieval layer (`retrieval/medrag_system.py`)
-            │       • Searches FAISS index and sentence-transformer embeddings
-            │       • Returns top documents serialized for the client
-            │
             └─ Response generation
-                    • Text-only: delegates to specialist pipelines and structured reasoners
+                    • Text chat: routes to `MedGemmaVQAClient` text generation
                     • VQA: routes to `MedGemmaVQAClient` (`models/medgemma_vqa.py`)
                             - Encodes image bytes as base64 for the vLLM endpoint
                             - Sends multimodal prompt to the MedGemma model
                             - Parses chat-completions response into plain text answer
 
-Response payloads are sent back to the browser, which updates chat history, confidence metrics, and retrieved-document summaries.
+Response payloads are sent back to the browser, which updates chat history, confidence metrics, and model metadata.
 ```
 
 ## Why This Pipeline Is Better
 
-- **Unified experience:** Text consultations and image-grounded questions share the same session state, so curriculum progress, confidence tracking, and specialist routing apply consistently across modalities.
-- **Curriculum-aware reasoning:** Difficulty sampling and domain triage let the agent scale responses from introductory guidance to expert-level analysis without manual tuning for every conversation.
-- **Retrieval grounding:** The MedRAG subsystem supplies document snippets that surface supporting evidence to both the VQA client and the user, reducing hallucinations and increasing transparency.
+- **Single clinical backbone:** The same MedGemma family handles both text and image-grounded requests, reducing cross-model inconsistency.
+- **Cleaner operations:** Fewer moving parts means simpler debugging, easier reproducibility, and faster iteration on prompts and evaluation.
+- **Modality-aware outputs:** Responses naturally acknowledge imaging limitations and escalation pathways (for example, CT or MRI when needed).
 - **vLLM compatibility:** The MedGemma client speaks the OpenAI chat-completions protocol, allowing drop-in replacement of the underlying model or hosting stack without UI changes.
 - **Responsive front end:** The asynchronous VQA workflow previews images, validates inputs, and streams updates so users always see the context for generated answers.
 
@@ -142,4 +134,4 @@ pytest tests/test_medgemma_vqa.py
 
 - If VQA requests fail with connection errors, ensure `llama-server` is running and reachable at the URL in `MEDGEMMA_BASE_URL`.
 - To adjust MedGemma parameters, edit `MedGemmaConfig` in `backend/models/medgemma_vqa.py` (base URL, model name, decoding limits).
-- For curriculum or retrieval tuning, update the relevant modules under `backend/agents` and `backend/retrieval`.
+- For benchmark tuning, update prompt and metric logic in `scripts/benchmark_models.py`.
